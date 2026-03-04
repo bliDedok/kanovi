@@ -3,21 +3,34 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    # Prisma butuh DATABASE_URL walau cuma generate type (nggak konek DB).
+    env:
+      DATABASE_URL: "postgresql://kanovi:kanovi@localhost:5432/kanovi_pos?schema=public"
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: "pnpm"
+
       - name: Install
         run: pnpm install --frozen-lockfile=false
+
+      - name: Generate Prisma Client
+        run: pnpm --filter api prisma generate
+
       - name: Lint
         run: pnpm lint
+
       - name: Build
         run: pnpm build

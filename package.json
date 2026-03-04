@@ -4,6 +4,7 @@
   "packageManager": "pnpm@9.0.0",
   "scripts": {
   "dev": "pnpm -r --if-present dev",
+  "postinstall": "pnpm --filter api prisma generate",
   "build": "pnpm -r --if-present build",
   "lint": "pnpm -r --if-present lint",
   "format": "prettier -w .",
