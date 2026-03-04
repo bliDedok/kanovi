@@ -51,3 +51,5 @@ Endpoint pembayaran: `POST /orders/:id/pay` akan mengurangi stok bahan sesuai re
 - Halaman Inventory: low stock
 - Kitchen screen: antrian + status pesanan
 
+
+Tes CI
