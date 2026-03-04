@@ -3,15 +3,15 @@
   "private": true,
   "packageManager": "pnpm@9.0.0",
   "scripts": {
-    "dev": "pnpm -r dev",
-    "build": "pnpm -r build",
-    "lint": "pnpm -r lint",
-    "format": "prettier -w .",
-    "db:up": "docker compose up -d",
-    "db:down": "docker compose down",
-    "db:migrate": "pnpm --filter api prisma migrate dev",
-    "db:studio": "pnpm --filter api prisma studio"
-  },
+  "dev": "pnpm -r --if-present dev",
+  "build": "pnpm -r --if-present build",
+  "lint": "pnpm -r --if-present lint",
+  "format": "prettier -w .",
+  "db:up": "docker compose up -d",
+  "db:down": "docker compose down",
+  "db:migrate": "pnpm --filter api prisma migrate dev",
+  "db:studio": "pnpm --filter api prisma studio"
+},
   "devDependencies": {
     "prettier": "^3.3.3"
   }
