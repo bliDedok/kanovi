@@ -1,0 +1,9 @@
+node_modules
+.next
+dist
+.turbo
+*.log
+.env
+apps/api/.env
+apps/web/.env
+.DS_Store

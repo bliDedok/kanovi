@@ -1,0 +1,140 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  CASHIER
+  STAFF
+}
+
+// Catatan: ini placeholder—nanti bisa diganti tabel location agar fleksibel.
+enum Location {
+  COUNTER
+  KITCHEN
+  BAR
+}
+
+enum PaymentMethod {
+  CASH
+  QRIS
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  VOID
+}
+
+enum OrderStatus {
+  NEW
+  IN_PROGRESS
+  READY
+  DONE
+  CANCELED
+}
+
+enum StockReason {
+  ORDER
+  ADJUSTMENT
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  role      Role
+  location  Location
+  orders    Order[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Menu {
+  id        Int           @id @default(autoincrement())
+  name      String
+  price     Int
+  recipes   Recipe[]
+  details   OrderDetail[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([name])
+}
+
+model Ingredient {
+  id        Int             @id @default(autoincrement())
+  name      String
+  stock     Int
+  unit      String
+  recipes   Recipe[]
+  movements StockMovement[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([name])
+}
+
+// Relasi menu -> bahan (berapa yang dibutuhkan)
+model Recipe {
+  id           Int @id @default(autoincrement())
+  menuId       Int
+  ingredientId Int
+  amountNeeded Int
+
+  menu       Menu       @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  @@unique([menuId, ingredientId])
+}
+
+model Order {
+  id            Int           @id @default(autoincrement())
+  userId        Int
+  origin        Location
+  customerName  String?
+  paymentMethod PaymentMethod
+  paymentStatus PaymentStatus @default(UNPAID)
+  status        OrderStatus   @default(NEW)
+  totalPrice    Int           @default(0)
+  orderedAt     DateTime      @default(now())
+
+  user          User            @relation(fields: [userId], references: [id])
+  details       OrderDetail[]
+  StockMovement StockMovement[]
+
+  @@index([orderedAt])
+  @@index([paymentStatus])
+  @@index([status])
+}
+
+model OrderDetail {
+  id       Int   @id @default(autoincrement())
+  orderId  Int
+  menuId   Int
+  qty      Int
+  price    Int // snapshot harga saat transaksi
+  subtotal Int
+  order    Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menu     Menu  @relation(fields: [menuId], references: [id])
+}
+
+// Ledger pergerakan stok biar bisa audit
+model StockMovement {
+  id           Int         @id @default(autoincrement())
+  ingredientId Int
+  qtyChange    Int // negatif untuk OUT, positif untuk IN
+  reason       StockReason
+  orderId      Int?
+  createdAt    DateTime    @default(now())
+
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  order      Order?     @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([ingredientId])
+}
