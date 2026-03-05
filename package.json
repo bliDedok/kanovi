@@ -11,7 +11,8 @@
   "db:up": "docker compose up -d",
   "db:down": "docker compose down",
   "db:migrate": "pnpm --filter api prisma migrate dev",
-  "db:studio": "pnpm --filter api prisma studio"
+  "db:studio": "pnpm --filter api prisma studio",
+  "seed": "cd apps/api && pnpm tsx prisma/seed.ts"
 },
   "devDependencies": {
     "prettier": "^3.3.3"
