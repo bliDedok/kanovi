@@ -169,7 +169,7 @@ app.post("/dev/seed", async (_req, reply) => {
   if (process.env.NODE_ENV === "production") return reply.code(403).send({ error: "Forbidden" });
 
   const [u] = await prisma.user.findMany({ take: 1 });
-  const user = u ?? await prisma.user.create({ data: { name: "Kasir 1", role: "CASHIER", location: "COUNTER" } });
+  const user = u ?? await prisma.user.create({ data: { name: "Kasir 1", username: "kasirdemo", password: "dummy123", role: "PEGAWAI", location: "COUNTER" } });
 
   const kopi = await prisma.menu.upsert({
     where: { id: 1 },
