@@ -173,6 +173,18 @@ app.post("/dev/seed", async (_req, reply) => {
     create: { id: 1, name: "Es Kopi Susu", price: 18000 }
   });
 
+  const teh = await prisma.menu.upsert({
+    where: {id: 2 },
+    update: {name: "Es Teh Manis", price: 10000 },
+    create: {id:2, name: "Es Teh Manis", price: 10000}
+  });
+
+  const rotibakar = await prisma.menu.upsert({
+    where: {id: 3},
+    update: {name: "Roti Bakar",  price: 15000},
+    create: {id:3, name: "Roti Bakar", price: 15000}
+  });
+
   const gula = await prisma.ingredient.upsert({
     where: { id: 1 },
     update: { name: "Gula", stock: 1000, unit: "gram" },
@@ -182,6 +194,12 @@ app.post("/dev/seed", async (_req, reply) => {
     where: { id: 2 },
     update: { name: "Susu", stock: 2000, unit: "ml" },
     create: { id: 2, name: "Susu", stock: 2000, unit: "ml" }
+  });
+
+  const roti = await prisma.ingredient.upsert({
+    where: { id: 3 },
+    update: {name: "Roti", stock: 500, unit: "buah"},
+    create: {id: 3, name: "Roti", stock: 500, unit: "buah"}
   });
 
   await prisma.recipe.upsert({
@@ -194,6 +212,24 @@ app.post("/dev/seed", async (_req, reply) => {
     update: { amountNeeded: 150 },
     create: { menuId: kopi.id, ingredientId: susu.id, amountNeeded: 150 }
   });
+
+  await prisma.recipe.upsert({
+    where: { menuId_ingredientId: { menuId: teh.id, ingredientId: gula.id}},
+    update: {amountNeeded: 15},
+    create: {menuId: teh.id, ingredientId: gula.id, amountNeeded: 15}
+  });
+
+  await prisma.recipe.upsert({
+    where: {menuId_ingredientId: {menuId: rotibakar.id, ingredientId: roti.id}},
+    update: {amountNeeded: 2},
+    create: {menuId: rotibakar.id, ingredientId: roti.id, amountNeeded:2}
+  })
+
+  await prisma.recipe.upsert({
+    where: {menuId_ingredientId: {menuId: rotibakar.id, ingredientId: susu.id}},
+    update: {amountNeeded: 10},
+    create: {menuId: rotibakar.id, ingredientId: susu.id, amountNeeded: 10}
+  })
 
   return { ok: true, userId: user.id };
 });
