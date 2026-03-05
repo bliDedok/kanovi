@@ -2,6 +2,8 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { z } from "zod";
 import { prisma } from "./prisma";
+import { loginUser } from "./controllers/authController";
+import { verifyToken } from './middleware/authMiddleware';
 
 const port = Number(process.env.PORT ?? 3001);
 const webOrigin = process.env.WEB_ORIGIN ?? "http://localhost:3000";
@@ -10,9 +12,11 @@ const app = Fastify({ logger: true });
 await app.register(cors, { origin: webOrigin, credentials: true });
 
 app.get("/health", async () => ({ ok: true, ts: new Date().toISOString() }));
+  
+app.post("/api/auth/login", loginUser);
 
 // --- MENUS ---
-app.get("/menus", async () => {
+app.get("/menus", { preHandler: [verifyToken] }, async () => {
   return prisma.menu.findMany({ orderBy: { id: "asc" } });
 });
 
@@ -28,7 +32,7 @@ const orderCreateSchema = z.object({
   })).min(1)
 });
 
-app.post("/orders", async (req, reply) => {
+app.post("/orders", { preHandler: [verifyToken] }, async (req, reply) => {
   const parsed = orderCreateSchema.safeParse(req.body);
   if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
   const { userId, origin, customerName, paymentMethod, items } = parsed.data;
@@ -165,7 +169,7 @@ app.post("/dev/seed", async (_req, reply) => {
   if (process.env.NODE_ENV === "production") return reply.code(403).send({ error: "Forbidden" });
 
   const [u] = await prisma.user.findMany({ take: 1 });
-  const user = u ?? await prisma.user.create({ data: { name: "Kasir 1", role: "CASHIER", location: "COUNTER" } });
+  const user = u ?? await prisma.user.create({ data: { name: "Kasir 1", username: "kasirdemo", password: "dummy123", role: "PEGAWAI", location: "COUNTER" } });
 
   const kopi = await prisma.menu.upsert({
     where: { id: 1 },

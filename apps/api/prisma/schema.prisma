@@ -9,8 +9,7 @@ datasource db {
 
 enum Role {
   OWNER
-  CASHIER
-  STAFF
+  PEGAWAI
 }
 
 // Catatan: ini placeholder—nanti bisa diganti tabel location agar fleksibel.
@@ -47,6 +46,8 @@ enum StockReason {
 model User {
   id        Int      @id @default(autoincrement())
   name      String
+  username  String   @unique
+  password  String // Akan menyimpan password yang di-hash
   role      Role
   location  Location
   orders    Order[]
