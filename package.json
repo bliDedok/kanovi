@@ -12,7 +12,8 @@
   "db:down": "docker compose down",
   "db:migrate": "pnpm --filter api prisma migrate dev",
   "db:studio": "pnpm --filter api prisma studio",
-  "seed": "cd apps/api && pnpm tsx prisma/seed.ts"
+  "seed": "cd apps/api && pnpm tsx prisma/seed.ts",
+  "reset": "pnpm --filter api prisma migrate reset --schema ./prisma/schema.prisma"
 },
   "devDependencies": {
     "prettier": "^3.3.3"

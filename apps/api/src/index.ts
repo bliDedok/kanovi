@@ -68,8 +68,18 @@ app.post("/orders", { preHandler: [verifyToken] }, async (req, reply) => {
   return order;
 });
 
+const paySchema = z.object({
+  paymentMethod: z.enum(["CASH", "QRIS"]),
+  overrideStock: z.boolean().optional().default(false),
+  overrideNote: z.string().optional(),
+});
+
 // Bayar order -> kurangi stok sesuai resep
 app.post("/orders/:id/pay", async (req, reply) => {
+  const parsed = paySchema.safeParse(req.body);
+  if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+  const { paymentMethod, overrideStock, overrideNote } = parsed.data;
+
   const id = Number((req.params as any).id);
   if (!Number.isFinite(id)) return reply.code(400).send({ error: "Invalid id" });
 
@@ -139,7 +149,12 @@ app.post("/orders/:id/pay", async (req, reply) => {
     // update order -> PAID
     const paidOrder = await tx.order.update({
       where: { id: order.id },
-      data: { paymentStatus: "PAID" }
+      data: { paymentStatus: "PAID",
+          paymentMethod,
+          stockOverride: overrideStock,
+          overrideNote,
+          paidAt: new Date(),
+       },
     });
 
     // apply stock updates + movements
@@ -152,7 +167,7 @@ app.post("/orders/:id/pay", async (req, reply) => {
         data: {
           ingredientId,
           qtyChange: -need,
-          reason: "ORDER",
+          reason: overrideStock ? "SALE_OVERRIDE" : "SALE",
           orderId: order.id
         }
       });
