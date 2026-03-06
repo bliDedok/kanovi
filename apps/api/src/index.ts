@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "./prisma";
 import { loginUser } from "./controllers/authController";
 import { verifyToken } from './middleware/authMiddleware';
+import { createMenu, getAllMenus, updateMenu, deleteMenu } from './controllers/menuController';
 
 const port = Number(process.env.PORT ?? 3001);
 const webOrigin = process.env.WEB_ORIGIN ?? "http://localhost:3000";
@@ -16,9 +17,10 @@ app.get("/health", async () => ({ ok: true, ts: new Date().toISOString() }));
 app.post("/api/auth/login", loginUser);
 
 // --- MENUS ---
-app.get("/menus", { preHandler: [verifyToken] }, async () => {
-  return prisma.menu.findMany({ orderBy: { id: "asc" } });
-});
+app.get("/api/menus", { preHandler: [verifyToken] }, getAllMenus);
+app.post("/api/menus", { preHandler: [verifyToken] }, createMenu);
+app.put("/api/menus/:id", { preHandler: [verifyToken] }, updateMenu);
+app.delete("/api/menus/:id", { preHandler: [verifyToken] }, deleteMenu);
 
 // --- ORDERS ---
 const orderCreateSchema = z.object({
