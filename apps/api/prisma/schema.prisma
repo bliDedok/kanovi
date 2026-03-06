@@ -39,8 +39,11 @@ enum OrderStatus {
 }
 
 enum StockReason {
-  ORDER
+  SALE
+  SALE_OVERRIDE
+  RESTOCK
   ADJUSTMENT
+  SPOIL
 }
 
 model User {
@@ -71,7 +74,7 @@ model Ingredient {
   id        Int             @id @default(autoincrement())
   name      String
   stock     Int
-  unit      String
+  unit      String          // dalam bentuk satuan contoh: gram, ml, pcs
   recipes   Recipe[]
   movements StockMovement[]
   createdAt DateTime        @default(now())
@@ -98,19 +101,26 @@ model Order {
   userId        Int
   origin        Location
   customerName  String?
-  paymentMethod PaymentMethod
+
+  paymentMethod PaymentMethod?         // draft boleh null
   paymentStatus PaymentStatus @default(UNPAID)
   status        OrderStatus   @default(NEW)
+
   totalPrice    Int           @default(0)
   orderedAt     DateTime      @default(now())
+  paidAt        DateTime?
 
-  user          User            @relation(fields: [userId], references: [id])
+  stockOverride Boolean       @default(false)
+  overrideNote  String?
+
+  user          User          @relation(fields: [userId], references: [id])
   details       OrderDetail[]
-  StockMovement StockMovement[]
+  stockMovements StockMovement[]
 
   @@index([orderedAt])
   @@index([paymentStatus])
   @@index([status])
+  @@index([userId])
 }
 
 model OrderDetail {
