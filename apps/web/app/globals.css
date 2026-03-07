@@ -1,1 +1,19 @@
 @import "tailwindcss";
+
+@theme {
+  /* TEMA TERANG (Kopi Susu & Cream) */
+  --color-kanovi-bone: #EBE0CE;    /* Kopi Susu (Background Utama, lebih teduh) */
+  --color-kanovi-paper: #FDFBF7;   /* Putih Tulang Hangat (Background Tabel/Kartu) */
+  --color-kanovi-cream: #DFCDAE;   /* Susu Karamel (Header Tabel / Hover) */
+  
+  /* TEMA GELAP (Americano & Espresso) */
+  --color-kanovi-dark: #2C231F;    /* Americano (Background Utama Dark Mode) */
+  --color-kanovi-darker: #1A1412;  /* Espresso (Sidebar / Kartu Dark Mode) */
+  
+  /* WARNA TEKS & AKSEN */
+  --color-kanovi-wood: #A26A42;    /* Coklat Kayu (Aksen / Tombol Tambah) */
+  --color-kanovi-coffee: #4A3022;  /* Coklat Kopi Pekat (Warna Teks Utama) */
+  --color-kanovi-danger: #8C3A3A;  /* Merah Bata / Red Velvet (Tombol Hapus) */
+}
+
+@custom-variant dark (&:is(.dark *));
