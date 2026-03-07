@@ -11,7 +11,24 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="id">
+    // Tambahkan suppressHydrationWarning agar Next.js tidak protes saat kita inject class 'dark' secara manual
+    <html lang="id" suppressHydrationWarning>
+      <head>
+        {/* SCRIPT PENCEGAT ANTI-KEDIP */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                if (localStorage.getItem('kanovi_theme') === 'dark' || (!('kanovi_theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                  document.documentElement.classList.add('dark');
+                } else {
+                  document.documentElement.classList.remove('dark');
+                }
+              } catch (_) {}
+            `,
+          }}
+        />
+      </head>
       <body>{children}</body>
     </html>
   );

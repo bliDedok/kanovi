@@ -75,3 +75,18 @@ export const deleteMenu = async (req: FastifyRequest, reply: FastifyReply) => {
     return reply.code(500).send({ message: "Gagal menghapus menu." });
   }
 };
+
+export const getMenuById = async (req: FastifyRequest, reply: FastifyReply) => {
+  const { id } = req.params as { id: string };
+  try {
+    const menu = await prisma.menu.findUnique({
+      where: { id: Number(id) }
+    });
+    
+    if (!menu) return reply.code(404).send({ message: "Menu tidak ditemukan" });
+    
+    return reply.code(200).send(menu);
+  } catch (error) {
+    return reply.code(500).send({ message: "Gagal mengambil data menu" });
+  }
+};

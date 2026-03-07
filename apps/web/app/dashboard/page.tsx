@@ -4,27 +4,31 @@ export default function DashboardPage() {
   return (
     <div className="max-w-5xl mx-auto animate-fade-in w-full">
       <div className="mb-6 md:mb-8">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Dashboard Owner</h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-2 text-sm md:text-lg">Selamat datang, Owner! Pantau performa dan kelola data Kanovi Escape di sini.</p>
+        <h1 className="text-2xl md:text-3xl font-bold text-kanovi-coffee dark:text-kanovi-bone">Dashboard Owner</h1>
+        <p className="text-kanovi-coffee/70 dark:text-kanovi-cream/70 mt-2 text-sm md:text-lg">Selamat datang, Owner! Pantau performa dan kelola data Kanovi Escape di sini.</p>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-        <Link href="/dashboard/menu" className="group bg-white dark:bg-gray-800 p-5 md:p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 hover:border-green-500 dark:hover:border-green-500 hover:shadow-md transition-all cursor-pointer">
-          <div className="bg-green-100 dark:bg-green-900/30 w-12 h-12 md:w-14 md:h-14 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+        {/* KARTU MENU */}
+        <Link href="/dashboard/menu" className="group bg-kanovi-paper dark:bg-kanovi-darker p-5 md:p-6 rounded-2xl shadow-sm border border-kanovi-cream/50 dark:border-white/5 hover:border-kanovi-wood dark:hover:border-kanovi-wood hover:shadow-md transition-all cursor-pointer">
+          <div className="bg-kanovi-cream/50 dark:bg-kanovi-wood/20 w-12 h-12 md:w-14 md:h-14 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
             <span className="text-2xl md:text-3xl">☕</span>
           </div>
-          <h2 className="text-xl md:text-2xl font-bold text-gray-800 dark:text-white mb-2 group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">Kelola Menu</h2>
-          <p className="text-sm md:text-base text-gray-500 dark:text-gray-400">Tambah, edit, dan hapus daftar kopi beserta harganya.</p>
+          <h2 className="text-xl md:text-2xl font-bold text-kanovi-coffee dark:text-kanovi-bone mb-2 group-hover:text-kanovi-wood transition-colors">Kelola Menu</h2>
+          <p className="text-sm md:text-base text-kanovi-coffee/70 dark:text-kanovi-cream/60">Tambah, edit, dan hapus daftar kopi beserta harganya.</p>
         </Link>
         
-        <div className="bg-gray-50 dark:bg-gray-800/50 p-5 md:p-6 rounded-2xl border border-gray-200 dark:border-gray-700/50 opacity-60 cursor-not-allowed">
-          <div className="bg-gray-200 dark:bg-gray-700 w-12 h-12 md:w-14 md:h-14 rounded-xl flex items-center justify-center mb-4">
+        {/* KARTU BAHAN */}
+        <div className="bg-kanovi-cream/20 dark:bg-kanovi-darker/50 p-5 md:p-6 rounded-2xl border border-kanovi-cream/30 dark:border-white/5 opacity-60 cursor-not-allowed">
+          <div className="bg-kanovi-cream/60 dark:bg-white/5 w-12 h-12 md:w-14 md:h-14 rounded-xl flex items-center justify-center mb-4">
             <span className="text-2xl md:text-3xl opacity-50">📦</span>
           </div>
-          <h2 className="text-xl md:text-2xl font-bold text-gray-800 dark:text-gray-300 mb-2">Kelola Bahan</h2>
-          <p className="text-sm md:text-base text-gray-500 dark:text-gray-400">Atur stok bahan baku (Segera Hadir).</p>
+          <h2 className="text-xl md:text-2xl font-bold text-kanovi-coffee/70 dark:text-kanovi-bone/70 mb-2">Kelola Bahan</h2>
+          <p className="text-sm md:text-base text-kanovi-coffee/60 dark:text-kanovi-cream/40">Atur stok bahan baku (Segera Hadir).</p>
         </div>
       </div>
     </div>
+
+    
   );
 }
