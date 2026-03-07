@@ -6,11 +6,8 @@ export default function LogoutButton() {
   const router = useRouter();
 
   const handleLogout = () => {
-    // Cara menghapus cookies adalah dengan mengatur tanggal kadaluarsanya ke masa lalu
     document.cookie = "kanovi_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     document.cookie = "kanovi_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-    
-    // Arahkan kembali ke login
     router.push("/login");
     router.refresh();
   };
@@ -18,9 +15,9 @@ export default function LogoutButton() {
   return (
     <button 
       onClick={handleLogout} 
-      style={{ padding: '8px 16px', backgroundColor: '#ff4d4d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+      className="w-full py-2.5 px-4 bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/30 dark:hover:bg-red-900/60 dark:text-red-400 font-semibold rounded-lg transition-colors flex justify-center items-center gap-2"
     >
-      Keluar (Logout)
+      <span>🚪</span> Keluar
     </button>
   );
 }
