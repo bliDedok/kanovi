@@ -4,39 +4,43 @@ import bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('Mulai melakukan seeding 4 data user...');
+  console.log('Mulai melakukan seeding 4 data user (PIN Mode)...');
 
-  // 1. Hash password
-  const passwordOwner = await bcrypt.hash('owner123', 10);
-  const passwordPegawai = await bcrypt.hash('kasir123', 10);
+  // 1. Hash password angka PIN (6 digit)
+  const passwordOwner = await bcrypt.hash('123456', 10);
+  const passwordPegawai = await bcrypt.hash('654321', 10); // PIN Kasir
 
   // 2. Data 2 Owner (Novi & Dimas)
   await prisma.user.upsert({
     where: { username: 'novi' },
-    update: {}, 
+    // PERBAIKAN: Masukkan passwordOwner ke dalam update
+    update: { password: passwordOwner }, 
     create: { username: 'novi', password: passwordOwner, role: 'OWNER', name: 'Kak Novi', location: 'COUNTER' },
   });
 
   await prisma.user.upsert({
     where: { username: 'dimas' },
-    update: {}, 
+    // PERBAIKAN: Masukkan passwordOwner ke dalam update
+    update: { password: passwordOwner }, 
     create: { username: 'dimas', password: passwordOwner, role: 'OWNER', name: 'Kak Dimas', location: 'COUNTER' },
   });
 
-  // 3. Data 2 Pegawai (Diah & Pegawai 2)
+  // 3. Data 2 Pegawai (Diah & Reza)
   await prisma.user.upsert({
     where: { username: 'diah' },
-    update: {},
-    create: { username: 'diah', password: passwordPegawai, role: 'PEGAWAI', name: 'Kak Diah', location: 'KITCHEN' },
+    // PERBAIKAN: Masukkan passwordPegawai ke dalam update
+    update: { password: passwordPegawai },
+    create: { username: 'diah', password: passwordPegawai, role: 'PEGAWAI', name: 'Kak Diah', location: 'COUNTER' },
   });
 
   await prisma.user.upsert({
-    where: { username: 'reza' }, // Ganti nama ini kalau kamu ada nama asli pegawainya
-    update: {},
-    create: { username: 'reza', password: passwordPegawai, role: 'PEGAWAI', name: 'Kak Reza', location: 'KITCHEN' },
+    where: { username: 'reza' }, 
+    // PERBAIKAN: Masukkan passwordPegawai ke dalam update
+    update: { password: passwordPegawai },
+    create: { username: 'reza', password: passwordPegawai, role: 'PEGAWAI', name: 'Kak Reza', location: 'COUNTER' },
   });
 
-  console.log('Seeding 4 user berhasil! 🎉');
+  console.log('Seeding PIN berhasil diupdate! 🎉');
 }
 
 main()
