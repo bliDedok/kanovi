@@ -3,29 +3,23 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-// 1. DATA SEEDING
-const DUMMY_MENUS = [
-  { id: 1, name: "Kopi Susu Gula Aren", price: 18000 },
-  { id: 2, name: "Americano", price: 15000 },
-  { id: 3, name: "Matcha Latte", price: 22000 },
-  { id: 4, name: "Caramel Macchiato", price: 25000 },
-  { id: 5, name: "Espresso", price: 12000 },
-  { id: 6, name: "Red Velvet", price: 20000 },
-  { id: 7, name: "Caffe Latte", price: 20000 },
-  { id: 8, name: "Air Mineral", price: 5000 },
-];
-
 export default function POSPage() {
   const router = useRouter();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [cart, setCart] = useState<any[]>([]);
+  
+  // Ambil keranjang dari localStorage jika ada (saat tombol back dari checkout ditekan)
+  const [cart, setCart] = useState<any[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("kanovi_cart");
+      if (saved) return JSON.parse(saved);
+    }
+    return [];
+  });
   
   const [menus, setMenus] = useState<any[]>([]);
 
-  const getToken = () => {
-    return document.cookie.split('; ').find(row => row.startsWith('kanovi_token='))?.split('=')[1];
-  };
+  const getToken = () => document.cookie.split('; ').find(row => row.startsWith('kanovi_token='))?.split('=')[1];
 
   const fetchMenus = async () => {
     try {
@@ -33,10 +27,7 @@ export default function POSPage() {
       const res = await fetch("http://localhost:3001/api/menus", {
         headers: { "Authorization": `Bearer ${token}` }
       });
-      if (res.ok) {
-        const data = await res.json();
-        setMenus(data); 
-      }
+      if (res.ok) setMenus(await res.json()); 
     } catch (error) {
       console.error("Gagal mengambil data menu dari server", error);
     }
@@ -44,13 +35,14 @@ export default function POSPage() {
 
   useEffect(() => {
     fetchMenus();
-
     const savedTheme = localStorage.getItem("kanovi_theme");
     if (savedTheme === "dark" || document.documentElement.classList.contains("dark")) {
       setIsDarkMode(true);
       document.documentElement.classList.add("dark");
     }
-  }, []);
+    // Simpan keranjang setiap kali berubah
+    localStorage.setItem("kanovi_cart", JSON.stringify(cart));
+  }, [cart]);
 
   const toggleTheme = () => {
     if (isDarkMode) {
@@ -94,6 +86,12 @@ export default function POSPage() {
     menu.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // === FUNGSI PINDAH KE HALAMAN CHECKOUT ===
+  const handleGoToCheckout = () => {
+    localStorage.setItem("kanovi_cart", JSON.stringify(cart)); // Pastikan tersimpan
+    router.push("/pos/checkout"); // Pindah ke halaman baru
+  };
+
   return (
     <div className="flex h-screen bg-kanovi-bone dark:bg-kanovi-dark transition-colors duration-300 font-sans overflow-hidden">
       
@@ -101,15 +99,12 @@ export default function POSPage() {
           BAGIAN KIRI: DAFTAR MENU
           ========================================= */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
-        
-        {/* HEADER RESPONSIVE: px-3 di HP/iPad Portrait, px-6 di Desktop */}
         <header className="h-16 flex items-center justify-between px-3 md:px-4 lg:px-6 bg-kanovi-paper dark:bg-kanovi-darker border-b border-kanovi-cream/50 dark:border-white/5 shadow-sm z-10 shrink-0">
           <div className="flex flex-col min-w-max pr-2">
             <h1 className="text-base md:text-lg font-bold text-kanovi-coffee dark:text-kanovi-bone leading-tight">POS Kanovi</h1>
             <p className="text-[10px] md:text-xs text-kanovi-coffee/70 dark:text-kanovi-cream/70 -mt-0.5 hidden md:block">Sistem Kasir</p>
           </div>
 
-          {/* SEARCH BAR RESPONSIVE: max-w-sm di iPad Portrait, melar ke max-w-xl di Desktop */}
           <div className="flex-1 max-w-sm md:max-w-md lg:max-w-xl mx-2 md:mx-4 relative">
             <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-kanovi-wood dark:text-kanovi-cream/50">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
@@ -124,34 +119,16 @@ export default function POSPage() {
           </div>
 
           <div className="flex items-center gap-2 md:gap-3 min-w-max">
-            <button 
-              onClick={toggleTheme} 
-              className="p-2 bg-kanovi-bone dark:bg-kanovi-dark rounded-full hover:bg-kanovi-cream/50 transition-colors text-kanovi-coffee dark:text-kanovi-cream border border-kanovi-cream/50 dark:border-white/10 text-sm"
-              title="Ubah Tema"
-            >
+            <button onClick={toggleTheme} className="p-2 bg-kanovi-bone dark:bg-kanovi-dark rounded-full hover:bg-kanovi-cream/50 transition-colors text-kanovi-coffee dark:text-kanovi-cream border border-kanovi-cream/50 dark:border-white/10 text-sm">
               {isDarkMode ? "☀️" : "🌙"}
             </button>
-            
-            <button 
-              onClick={() => {
-                document.cookie = "kanovi_token=; path=/; max-age=0;";
-                document.cookie = "kanovi_role=; path=/; max-age=0;";
-                router.push("/login");
-              }}
-              className="flex items-center gap-1.5 md:gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-kanovi-danger/10 hover:bg-kanovi-danger/20 text-kanovi-danger dark:bg-kanovi-danger/20 dark:hover:bg-kanovi-danger/40 dark:text-red-400 text-xs md:text-sm font-semibold rounded-lg transition-colors border border-kanovi-danger/20"
-            >
-              <span>🚪</span>
-              <span className="hidden sm:inline">Keluar</span>
+            <button onClick={() => { document.cookie = "kanovi_token=; path=/; max-age=0;"; document.cookie = "kanovi_role=; path=/; max-age=0;"; router.push("/login"); }} className="flex items-center gap-1.5 md:gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-kanovi-danger/10 hover:bg-kanovi-danger/20 text-kanovi-danger dark:bg-kanovi-danger/20 dark:hover:bg-kanovi-danger/40 dark:text-red-400 text-xs md:text-sm font-semibold rounded-lg transition-colors border border-kanovi-danger/20">
+              <span>🚪</span> <span className="hidden sm:inline">Keluar</span>
             </button>
           </div>
         </header>
 
         <main className="flex-1 overflow-y-auto p-3 md:p-4 lg:p-6">
-          {/* GRID RESPONSIVE:
-              - sm: 4 kolom
-              - md (iPad Portrait): 4 atau 5 kolom (menyesuaikan sisa ruang)
-              - lg (iPad Landscape): 6 kolom
-          */}
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-3 sm:gap-4">
             {filteredMenus.map((menu) => (
               <button 
@@ -164,13 +141,11 @@ export default function POSPage() {
               </button>
             ))}
           </div>
-          
           {filteredMenus.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-full text-kanovi-coffee/50 dark:text-kanovi-cream/50 px-4 text-center">
-              <span className="text-3xl mb-3">🕵️‍♂️</span>
-              <p className="text-sm">Tidak ada menu yang ditemukan.</p>
-              <p className="text-xs mt-1">Pastikan Owner sudah menambahkan menu di Dashboard.</p>
-            </div>
+             <div className="flex flex-col items-center justify-center h-full text-kanovi-coffee/50 dark:text-kanovi-cream/50 px-4 text-center">
+             <span className="text-3xl mb-3">🕵️‍♂️</span>
+             <p className="text-sm">Tidak ada menu yang ditemukan.</p>
+           </div>
           )}
         </main>
       </div>
@@ -178,7 +153,6 @@ export default function POSPage() {
       {/* =========================================
           BAGIAN KANAN: KERANJANG PESANAN
           ========================================= */}
-      {/* KERANJANG RESPONSIVE: w-72 di HP/iPad kecil, w-80 di iPad Portrait, w-96 di iPad Landscape/Desktop */}
       <aside className="w-72 md:w-80 lg:w-96 shrink-0 bg-kanovi-paper dark:bg-kanovi-darker border-l border-kanovi-cream/50 dark:border-white/5 flex flex-col shadow-2xl z-20">
         
         <div className="h-16 flex items-center px-4 sm:px-5 pt-2 shrink-0">
@@ -199,12 +173,10 @@ export default function POSPage() {
               {cart.map((item) => (
                 <div key={item.id} className="flex flex-col py-3 border-b border-kanovi-cream/30 dark:border-white/5 last:border-0">
                   <h4 className="font-semibold text-kanovi-coffee dark:text-kanovi-bone text-xs md:text-sm leading-tight mb-1.5">{item.name}</h4>
-                  
                   <div className="flex justify-between items-center">
                     <div className="text-kanovi-wood dark:text-kanovi-cream/70 text-xs md:text-sm font-medium">
                       Rp {(item.price * item.qty).toLocaleString("id-ID")}
                     </div>
-                    
                     <div className="flex items-center gap-1 md:gap-2 bg-kanovi-bone dark:bg-kanovi-dark rounded-full p-1 border border-kanovi-cream/50 dark:border-white/5">
                       <button onClick={() => updateQty(item.id, -1)} className="w-6 h-6 md:w-7 md:h-7 rounded-full bg-kanovi-paper dark:bg-kanovi-darker flex items-center justify-center text-kanovi-coffee dark:text-kanovi-cream hover:bg-kanovi-wood hover:text-white transition-colors shadow-sm">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3 md:w-3.5 md:h-3.5"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -230,7 +202,9 @@ export default function POSPage() {
           </div>
 
           <div className="flex flex-col gap-2.5">
+            {/* INI YANG BERUBAH: SEKARANG PINDAH HALAMAN */}
             <button 
+              onClick={handleGoToCheckout}
               disabled={cart.length === 0}
               className="w-full py-3 md:py-3.5 bg-kanovi-wood hover:bg-kanovi-coffee text-white font-bold text-xs md:text-sm rounded-xl shadow-md active:scale-[0.98] transition-all flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -246,7 +220,6 @@ export default function POSPage() {
             </button>
           </div>
         </div>
-
       </aside>
 
     </div>
