@@ -5,6 +5,7 @@ import { prisma } from "./prisma";
 import { loginUser } from "./controllers/authController";
 import { verifyToken } from './middleware/authMiddleware';
 import { createMenu, getAllMenus, updateMenu, getMenuById,deleteMenu } from './controllers/menuController';
+import {getAllIngredients, getLowStockIngredients, createIngredient, updateIngredient, adjustIngredientStock, } from "./controllers/ingredientController";
 
 const port = Number(process.env.PORT ?? 3001);
 const webOrigin = process.env.WEB_ORIGIN ?? "http://localhost:3000";
@@ -22,6 +23,13 @@ app.post("/api/menus", { preHandler: [verifyToken] }, createMenu);
 app.put("/api/menus/:id", { preHandler: [verifyToken] }, updateMenu); 
 app.delete("/api/menus/:id", { preHandler: [verifyToken] }, deleteMenu);
 app.get("/api/menus/:id", { preHandler: [verifyToken] }, getMenuById);
+
+// --- INGREDIENTS ---
+app.get("/api/ingredients", { preHandler: [verifyToken] }, getAllIngredients);
+app.get("/api/ingredients/low-stock", { preHandler: [verifyToken] }, getLowStockIngredients);
+app.post("/api/ingredients", { preHandler: [verifyToken] }, createIngredient);
+app.patch("/api/ingredients/:id", { preHandler: [verifyToken] }, updateIngredient);
+app.post("/api/ingredients/:id/adjust", { preHandler: [verifyToken] }, adjustIngredientStock);
 
 // --- ORDERS ---
 const orderCreateSchema = z.object({
@@ -208,21 +216,22 @@ app.post("/dev/seed", async (_req, reply) => {
   });
 
   const gula = await prisma.ingredient.upsert({
-    where: { id: 1 },
-    update: { name: "Gula", stock: 1000, unit: "gram" },
-    create: { id: 1, name: "Gula", stock: 1000, unit: "gram" }
-  });
-  const susu = await prisma.ingredient.upsert({
-    where: { id: 2 },
-    update: { name: "Susu", stock: 2000, unit: "ml" },
-    create: { id: 2, name: "Susu", stock: 2000, unit: "ml" }
-  });
+  where: { id: 1 },
+  update: { name: "Gula", stock: 1000, unit: "gram", minStock: 200 },
+  create: { id: 1, name: "Gula", stock: 1000, unit: "gram", minStock: 200 },
+});
 
-  const roti = await prisma.ingredient.upsert({
-    where: { id: 3 },
-    update: {name: "Roti", stock: 500, unit: "buah"},
-    create: {id: 3, name: "Roti", stock: 500, unit: "buah"}
-  });
+const susu = await prisma.ingredient.upsert({
+  where: { id: 2 },
+  update: { name: "Susu", stock: 2000, unit: "ml", minStock: 300 },
+  create: { id: 2, name: "Susu", stock: 2000, unit: "ml", minStock: 300 },
+});
+
+const roti = await prisma.ingredient.upsert({
+  where: { id: 3 },
+  update: { name: "Roti", stock: 500, unit: "buah", minStock: 50 },
+  create: { id: 3, name: "Roti", stock: 500, unit: "buah", minStock: 50 },
+});
 
   await prisma.recipe.upsert({
     where: { menuId_ingredientId: { menuId: kopi.id, ingredientId: gula.id } },

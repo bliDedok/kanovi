@@ -73,14 +73,17 @@ model Menu {
 model Ingredient {
   id        Int             @id @default(autoincrement())
   name      String
-  stock     Int
+  stock     Int             @default(0)
   unit      String          // dalam bentuk satuan contoh: gram, ml, pcs
+  minStock  Int
   recipes   Recipe[]
   movements StockMovement[]
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
 
   @@index([name])
+  @@index([stock])
+  @@index([minStock])
 }
 
 // Relasi menu -> bahan (berapa yang dibutuhkan)
