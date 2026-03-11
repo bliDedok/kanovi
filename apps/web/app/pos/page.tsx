@@ -230,11 +230,6 @@ export default function POSPage() {
     }
   };
 
-  const handleGoToCheckout = () => {
-    localStorage.setItem("kanovi_cart", JSON.stringify(cart));
-    router.push("/pos/checkout");
-  };
-
   return (
     <div className="flex h-screen bg-kanovi-bone dark:bg-kanovi-dark transition-colors duration-300 font-sans overflow-hidden relative">
       <div className="flex-1 flex flex-col h-full overflow-hidden">
