@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ShoppingCart, Trash2, AlertTriangle } from "lucide-react"; // <-- Tambah AlertTriangle
+import { ShoppingCart, Trash2, AlertTriangle } from "lucide-react";
 
 export default function POSPage() {
   const router = useRouter();
@@ -579,7 +579,7 @@ export default function POSPage() {
               </span>
             </div>
             <button
-              onClick={() => handleProcessPayment("CASH")} // <-- Diubah
+              onClick={() => handleProcessPayment("CASH")} 
               disabled={!isEnough || cashNum === 0}
               className="w-full py-4 bg-kanovi-wood hover:bg-kanovi-coffee text-white font-bold rounded-xl shadow-md disabled:opacity-50 transition-colors"
             >
@@ -615,7 +615,7 @@ export default function POSPage() {
             </div>
 
             <button
-              onClick={() => handleProcessPayment("QRIS")} // <-- Diubah
+              onClick={() => handleProcessPayment("QRIS")} 
               className="w-full py-4 bg-kanovi-wood hover:bg-kanovi-coffee text-white font-bold rounded-xl shadow-md transition-colors"
             >
               Konfirmasi Uang Masuk
