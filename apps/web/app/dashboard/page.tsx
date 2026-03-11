@@ -26,15 +26,6 @@ export default function DashboardPage() {
           <p className="text-sm md:text-base text-kanovi-coffee/70 dark:text-kanovi-cream/60">Atur stok bahan baku dan monitor level minimum.</p>
         </Link>
 
-
-        {/* KARTU BAHAN */}
-        <div className="bg-kanovi-cream/20 dark:bg-kanovi-darker/50 p-5 md:p-6 rounded-2xl border border-kanovi-cream/30 dark:border-white/5 opacity-60 cursor-not-allowed">
-          <div className="bg-kanovi-cream/60 dark:bg-white/5 w-12 h-12 md:w-14 md:h-14 rounded-xl flex items-center justify-center mb-4">
-            <span className="text-2xl md:text-3xl opacity-50">📦</span>
-          </div>
-          <h2 className="text-xl md:text-2xl font-bold text-kanovi-coffee/70 dark:text-kanovi-bone/70 mb-2">Kelola Bahan</h2>
-          <p className="text-sm md:text-base text-kanovi-coffee/60 dark:text-kanovi-cream/40">Atur stok bahan baku (Segera Hadir).</p>
-        </div>
       </div>
     </div>
 
