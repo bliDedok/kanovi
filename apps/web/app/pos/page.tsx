@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ShoppingCart, Trash2 } from "lucide-react";
+import { ShoppingCart, Trash2, AlertTriangle } from "lucide-react";
 
 export default function POSPage() {
   const router = useRouter();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
+  // === STATE PEMBAYARAN & MODAL ===
   const [cashReceived, setCashReceived] = useState("");
   const [isCashModalOpen, setIsCashModalOpen] = useState(false);
   const [isQrisModalOpen, setIsQrisModalOpen] = useState(false);
@@ -16,10 +17,15 @@ export default function POSPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [finalChange, setFinalChange] = useState(0);
 
+  // === STATE BARU UNTUK TASK #13 (OVERRIDE STOCK) ===
+  const [isShortageModalOpen, setIsShortageModalOpen] = useState(false);
+  const [pendingPaymentMethod, setPendingPaymentMethod] = useState<"CASH" | "QRIS" | null>(null);
+
   const [cart, setCart] = useState<any[]>([]);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [menus, setMenus] = useState<any[]>([]);
 
+  // === STATE DIMSUM ===
   const [isDimsumModalOpen, setIsDimsumModalOpen] = useState(false);
   const [dimsumPrice, setDimsumPrice] = useState("");
   const [dimsumName, setDimsumName] = useState("Dimsum");
@@ -193,30 +199,35 @@ export default function POSPage() {
     .sort((a, b) => a - b)
     .slice(0, 4);
 
-  const handleConfirmCash = async () => {
-    if (!isEnough) return;
+  // === FUNGSI BAYAR GABUNGAN (CASH/QRIS + CEK STOK) ===
+  const handleProcessPayment = async (method: "CASH" | "QRIS", overrideStock = false) => {
+    if (method === "CASH" && !isEnough) return;
+
     try {
       await new Promise((resolve) => setTimeout(resolve, 500));
-      setFinalChange(kembalian);
+
+      // DUMMY 409 ERROR: Kalau Qty > 2 dan belum di-override, munculin peringatan kuning
+      const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
+      if (totalQty > 2 && !overrideStock) {
+        setPendingPaymentMethod(method);
+        setIsCashModalOpen(false);
+        setIsQrisModalOpen(false);
+        setIsShortageModalOpen(true);
+        return; 
+      }
+
+      // JIKA SUKSES / DI-OVERRIDE
+      setFinalChange(method === "CASH" ? kembalian : 0);
       setCart([]);
-      setCashReceived("");
+      if (method === "CASH") setCashReceived("");
       setIsCashModalOpen(false);
+      setIsQrisModalOpen(false);
+      setIsShortageModalOpen(false);
       setShowSuccessModal(true);
+      setPendingPaymentMethod(null);
     } catch (error) {
-      console.error("Gagal memproses pembayaran tunai", error);
+      console.error("Gagal memproses pembayaran", error);
     }
-  };
-
-  const handleConfirmQris = () => {
-    setFinalChange(0);
-    setCart([]);
-    setIsQrisModalOpen(false);
-    setShowSuccessModal(true);
-  };
-
-  const handleGoToCheckout = () => {
-    localStorage.setItem("kanovi_cart", JSON.stringify(cart));
-    router.push("/pos/checkout");
   };
 
   return (
@@ -278,6 +289,8 @@ export default function POSPage() {
 
         <main className="flex-1 overflow-y-auto p-3 md:p-4 lg:p-6">
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-3 sm:gap-4">
+            
+            {/* TOMBOL DIMSUM */}
             <button
               onClick={openDimsumModal}
               className="w-full max-w-32 aspect-square mx-auto bg-kanovi-wood text-white rounded-xl p-3 flex flex-col justify-between items-start text-left shadow-sm active:scale-95 transition-all border border-black/5"
@@ -465,6 +478,7 @@ export default function POSPage() {
         </div>
       </aside>
 
+      {/* MODAL KONFIRMASI HAPUS KERANJANG */}
       {isClearCartModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-kanovi-paper dark:bg-kanovi-darker rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-kanovi-cream/50 dark:border-white/5 relative">
@@ -496,6 +510,7 @@ export default function POSPage() {
         </div>
       )}
 
+      {/* MODAL CASH */}
       {isCashModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-kanovi-paper dark:bg-kanovi-darker rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-kanovi-cream/50 dark:border-white/5 relative">
@@ -564,7 +579,7 @@ export default function POSPage() {
               </span>
             </div>
             <button
-              onClick={handleConfirmCash}
+              onClick={() => handleProcessPayment("CASH")} 
               disabled={!isEnough || cashNum === 0}
               className="w-full py-4 bg-kanovi-wood hover:bg-kanovi-coffee text-white font-bold rounded-xl shadow-md disabled:opacity-50 transition-colors"
             >
@@ -574,6 +589,7 @@ export default function POSPage() {
         </div>
       )}
 
+      {/* MODAL QRIS */}
       {isQrisModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-kanovi-paper dark:bg-kanovi-darker rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-kanovi-cream/50 dark:border-white/5 relative">
@@ -599,7 +615,7 @@ export default function POSPage() {
             </div>
 
             <button
-              onClick={handleConfirmQris}
+              onClick={() => handleProcessPayment("QRIS")} 
               className="w-full py-4 bg-kanovi-wood hover:bg-kanovi-coffee text-white font-bold rounded-xl shadow-md transition-colors"
             >
               Konfirmasi Uang Masuk
@@ -608,6 +624,44 @@ export default function POSPage() {
         </div>
       )}
 
+      {/* MODAL PERINGATAN STOCK HABIS (OVERRIDE) */}
+      {isShortageModalOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-kanovi-paper dark:bg-kanovi-darker rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-yellow-500/50 dark:border-yellow-400/30 relative text-center">
+            <div className="w-16 h-16 mx-auto bg-yellow-100 dark:bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 rounded-full flex items-center justify-center mb-4">
+              <AlertTriangle className="w-8 h-8" />
+            </div>
+            <h3 className="text-xl font-bold text-kanovi-coffee dark:text-kanovi-bone mb-2">
+              Stok Sistem Habis!
+            </h3>
+            <p className="text-sm text-kanovi-coffee/80 dark:text-kanovi-cream/80 mb-6 px-2">
+              Berdasarkan catatan sistem, stok menu ini kurang/habis. Namun, jika kopi fisik masih tersedia di meja bar, Anda dapat melanjutkan transaksi ini.
+            </p>
+            
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setIsShortageModalOpen(false)} 
+                className="flex-1 py-3 bg-kanovi-bone dark:bg-white/5 hover:bg-kanovi-cream/50 dark:hover:bg-white/10 text-kanovi-coffee dark:text-kanovi-bone font-bold rounded-xl transition-colors border border-kanovi-cream/50 dark:border-white/10"
+              >
+                Batal Transaksi
+              </button>
+              
+              <button 
+                onClick={() => {
+                  if (pendingPaymentMethod) {
+                    handleProcessPayment(pendingPaymentMethod, true); // Override = true
+                  }
+                }} 
+                className="flex-1 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-xl shadow-md transition-colors"
+              >
+                Lanjut (Override)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL SUKSES */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-kanovi-paper dark:bg-kanovi-darker rounded-3xl shadow-2xl w-full max-w-sm p-8 text-center border border-kanovi-cream/50 dark:border-white/5">
@@ -643,6 +697,7 @@ export default function POSPage() {
         </div>
       )}
 
+      {/* MODAL DIMSUM MANUAL */}
       {isDimsumModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-kanovi-paper dark:bg-kanovi-darker rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-kanovi-cream/50 dark:border-white/5">
