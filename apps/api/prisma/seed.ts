@@ -35,32 +35,6 @@ async function main() {
   });
 
   console.log('Seeding PIN berhasil! 🎉');
-
-  // 2. TAMBAHKAN SEED PRODUCT DI SINI
-// ... kode user tetap sama di atas ...
-
-console.log('Mulai melakukan seeding data Menu...');
-
-// Cari bagian loop produk di seed.ts kamu, ganti dengan ini:
-const menuItems = [
-  { name: 'Kopi Susu Kanovi', price: 18000 },
-  { name: 'Americano Ice', price: 15000 },
-  { name: 'Cafe Latte', price: 22000 },
-  { name: 'Matcha Latte', price: 25000 },
-];
-
-for (const item of menuItems) {
-  await prisma.menu.upsert({
-    where: { id: 0 }, // id 0 tidak akan ketemu, jadi dia akan selalu lari ke create
-    update: {}, 
-    create: {
-      name: item.name,
-      price: item.price,
-    },
-  });
-}
-
-console.log('Seeding Menu berhasil! ☕✨');
 }
 
 main()

@@ -58,16 +58,27 @@ model User {
   updatedAt DateTime @updatedAt
 }
 
-model Menu {
-  id        Int           @id @default(autoincrement())
+model Category {
+  id        Int      @id @default(autoincrement())
   name      String
-  price     Int
-  recipes   Recipe[]
-  details   OrderDetail[]
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  slug      String   @unique
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  menus     Menu[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
 
-  @@index([name])
+model Menu {
+  id         Int        @id @default(autoincrement())
+  name       String
+  price      Int
+  categoryId Int?
+  category   Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  recipes    Recipe[]
+  details    OrderDetail[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
 }
 
 model Ingredient {
