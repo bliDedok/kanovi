@@ -1,15 +1,52 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ShoppingCart, Trash2, AlertTriangle } from "lucide-react";
+
+type PaymentMethod = "CASH" | "QRIS";
+
+type Menu = {
+  id: number;
+  name: string;
+  price: number;
+  categoryId?: number | null;
+  category?: {
+    id: number;
+    name: string;
+    slug: string;
+  } | null;
+};
+
+type CartItem = Menu & {
+  qty: number;
+};
+
+type JwtPayload = {
+  userId?: number;
+  id?: number;
+  role?: string;
+  exp?: number;
+};
+
+type ShortageItem = {
+  ingredientId: number;
+  ingredientName: string;
+  unit: string;
+  stock: number;
+  need: number;
+  shortBy: number;
+};
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:3001";
 
 export default function POSPage() {
   const router = useRouter();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // === STATE PEMBAYARAN & MODAL ===
+  const [selectedCategory, setSelectedCategory] = useState("ALL");
+  const [customerName, setCustomerName] = useState("");
   const [cashReceived, setCashReceived] = useState("");
   const [isCashModalOpen, setIsCashModalOpen] = useState(false);
   const [isQrisModalOpen, setIsQrisModalOpen] = useState(false);
@@ -17,18 +54,16 @@ export default function POSPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [finalChange, setFinalChange] = useState(0);
 
-  // === STATE BARU UNTUK TASK #13 (OVERRIDE STOCK) ===
   const [isShortageModalOpen, setIsShortageModalOpen] = useState(false);
-  const [pendingPaymentMethod, setPendingPaymentMethod] = useState<"CASH" | "QRIS" | null>(null);
+  const [pendingPaymentMethod, setPendingPaymentMethod] =
+    useState<PaymentMethod | null>(null);
+  const [pendingOrderId, setPendingOrderId] = useState<number | null>(null);
+  const [shortages, setShortages] = useState<ShortageItem[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [cart, setCart] = useState<any[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
-  const [menus, setMenus] = useState<any[]>([]);
-
-  // === STATE DIMSUM ===
-  const [isDimsumModalOpen, setIsDimsumModalOpen] = useState(false);
-  const [dimsumPrice, setDimsumPrice] = useState("");
-  const [dimsumName, setDimsumName] = useState("Dimsum");
+  const [menus, setMenus] = useState<Menu[]>([]);
 
   const getToken = () =>
     document.cookie
@@ -36,20 +71,148 @@ export default function POSPage() {
       .find((row) => row.startsWith("kanovi_token="))
       ?.split("=")[1];
 
+  const decodeJwtPayload = (token: string): JwtPayload | null => {
+    try {
+      const parts = token.split(".");
+      if (parts.length < 2) return null;
+      const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+      const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+      const json = atob(padded);
+      return JSON.parse(json) as JwtPayload;
+    } catch {
+      return null;
+    }
+  };
+
   const fetchMenus = async () => {
     try {
       const token = getToken();
-      const res = await fetch("http://localhost:3001/api/menus", {
+      if (!token) return;
+
+      const res = await fetch(`${API_BASE}/api/menus`, {
         headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
       });
-      if (res.ok) setMenus(await res.json());
+
+      if (res.ok) {
+        const data = await res.json();
+        setMenus(Array.isArray(data) ? data : []);
+      }
     } catch (error) {
       console.error("Gagal mengambil data menu", error);
     }
   };
 
+  const createDraftOrder = async () => {
+    const token = getToken();
+
+    if (!token) {
+      throw new Error("Token login tidak ditemukan. Silakan login ulang.");
+    }
+
+    const payload = decodeJwtPayload(token);
+    const userId = payload?.userId ?? payload?.id;
+
+    if (!userId) {
+      throw new Error("User login tidak valid. Silakan login ulang.");
+    }
+
+    const res = await fetch(`${API_BASE}/orders`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+      userId,
+      origin: "COUNTER",
+      customerName: customerName.trim() || undefined,
+      items: cart.map((item) => ({
+        menuId: item.id,
+        qty: item.qty,
+      })),
+    }),
+    });
+
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok) {
+      throw new Error(data?.message || data?.error || "Gagal membuat order.");
+    }
+
+    return data;
+  };
+
+  const checkOrderStock = async (orderId: number) => {
+    const token = getToken();
+
+    if (!token) {
+      throw new Error("Token login tidak ditemukan. Silakan login ulang.");
+    }
+
+    const res = await fetch(`${API_BASE}/orders/${orderId}/stock-check`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      cache: "no-store",
+    });
+
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok) {
+      throw new Error(data?.message || data?.error || "Gagal cek stok.");
+    }
+
+    return data as {
+      hasShortage: boolean;
+      shortages: ShortageItem[];
+    };
+  };
+
+  const payOrder = async (
+    orderId: number,
+    method: PaymentMethod,
+    overrideStock = false
+  ) => {
+    const token = getToken();
+
+    if (!token) {
+      throw new Error("Token login tidak ditemukan. Silakan login ulang.");
+    }
+
+    const res = await fetch(`${API_BASE}/orders/${orderId}/pay`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        paymentMethod: method,
+        overrideStock,
+        overrideNote: overrideStock ? "Override dari POS" : undefined,
+      }),
+    });
+
+    const data = await res.json().catch(() => null);
+
+    if (res.status === 409 && data?.error === "STOCK_NOT_ENOUGH") {
+      return {
+        kind: "SHORTAGE" as const,
+        shortages: Array.isArray(data?.shortages) ? data.shortages : [],
+      };
+    }
+
+    if (!res.ok) {
+      throw new Error(data?.message || data?.error || "Gagal memproses pembayaran.");
+    }
+
+    return {
+      kind: "SUCCESS" as const,
+      data,
+    };
+  };
+
   const openCashModal = () => {
-    setIsDimsumModalOpen(false);
     setCashReceived("");
     setIsCashModalOpen(true);
   };
@@ -60,36 +223,12 @@ export default function POSPage() {
   };
 
   const openQrisModal = () => {
-    setIsDimsumModalOpen(false);
     setIsQrisModalOpen(true);
-  };
-
-  const openDimsumModal = () => {
-    setIsCashModalOpen(false);
-    setIsQrisModalOpen(false);
-    setDimsumName("Dimsum");
-    setDimsumPrice("");
-    setIsDimsumModalOpen(true);
-  };
-
-  const appendDimsumDigit = (digit: string) => {
-    setDimsumPrice((prev) => {
-      const current = prev || "";
-      const next = current === "0" ? digit : current + digit;
-      return next.replace(/^0+(?=\d)/, "");
-    });
-  };
-
-  const backspaceDimsumDigit = () => {
-    setDimsumPrice((prev) => prev.slice(0, -1));
-  };
-
-  const clearDimsumDigit = () => {
-    setDimsumPrice("");
   };
 
   useEffect(() => {
     fetchMenus();
+
     const savedTheme = localStorage.getItem("kanovi_theme");
     if (
       savedTheme === "dark" ||
@@ -98,8 +237,15 @@ export default function POSPage() {
       setIsDarkMode(true);
       document.documentElement.classList.add("dark");
     }
+
     const savedCart = localStorage.getItem("kanovi_cart");
-    if (savedCart) setCart(JSON.parse(savedCart));
+    if (savedCart) {
+      try {
+        setCart(JSON.parse(savedCart));
+      } catch {
+        localStorage.removeItem("kanovi_cart");
+      }
+    }
 
     setIsDataLoaded(true);
   }, []);
@@ -122,7 +268,7 @@ export default function POSPage() {
     }
   };
 
-  const addToCart = (menu: any) => {
+  const addToCart = (menu: Menu) => {
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => item.id === menu.id);
       if (existingItem) {
@@ -132,29 +278,6 @@ export default function POSPage() {
       }
       return [...prevCart, { ...menu, qty: 1 }];
     });
-  };
-
-  const handleAddCustomDimsum = () => {
-    const price = parseInt(dimsumPrice.replace(/[^0-9]/g, ""), 10);
-
-    if (!price || price <= 0) {
-      alert("Harga dimsum wajib diisi dan harus lebih dari 0");
-      return;
-    }
-
-    const customItem = {
-      id: Date.now(),
-      name: dimsumName.trim() || "Dimsum",
-      price,
-      qty: 1,
-      isCustom: true,
-    };
-
-    setCart((prevCart) => [...prevCart, customItem]);
-
-    setDimsumPrice("");
-    setDimsumName("Dimsum");
-    setIsDimsumModalOpen(false);
   };
 
   const updateQty = (id: number, delta: number) => {
@@ -173,6 +296,10 @@ export default function POSPage() {
 
   const confirmClearCart = () => {
     setCart([]);
+    setCustomerName("");
+    setPendingOrderId(null);
+    setPendingPaymentMethod(null);
+    setShortages([]);
     setIsClearCartModalOpen(false);
   };
 
@@ -181,9 +308,34 @@ export default function POSPage() {
     0
   );
 
-  const filteredMenus = (Array.isArray(menus) ? menus : []).filter((menu) =>
-    menu.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const categoryOptions = useMemo(() => {
+  const map = new Map<number, { id: number; name: string; slug: string }>();
+
+  menus.forEach((menu) => {
+    if (menu.category?.id) {
+      map.set(menu.category.id, {
+        id: menu.category.id,
+        name: menu.category.name,
+        slug: menu.category.slug,
+      });
+    }
+  });
+
+  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+}, [menus]);
+
+  const filteredMenus = (Array.isArray(menus) ? menus : []).filter((menu) => {
+  const matchSearch = menu.name
+    .toLowerCase()
+    .includes(searchQuery.toLowerCase());
+
+  const matchCategory =
+    selectedCategory === "ALL"
+      ? true
+      : String(menu.category?.id ?? "") === selectedCategory;
+
+  return matchSearch && matchCategory;
+});
 
   const cashNum = parseInt(cashReceived.replace(/[^0-9]/g, "")) || 0;
   const kembalian = cashNum - totalTagihan;
@@ -199,34 +351,79 @@ export default function POSPage() {
     .sort((a, b) => a - b)
     .slice(0, 4);
 
-  // === FUNGSI BAYAR GABUNGAN (CASH/QRIS + CEK STOK) ===
-  const handleProcessPayment = async (method: "CASH" | "QRIS", overrideStock = false) => {
-    if (method === "CASH" && !isEnough) return;
+  const handlePaymentSuccess = (method: PaymentMethod) => {
+    setFinalChange(method === "CASH" ? Math.max(kembalian, 0) : 0);
+    setCart([]);
+    setCustomerName("");
+    setCashReceived("");
+    setIsCashModalOpen(false);
+    setIsQrisModalOpen(false);
+    setIsShortageModalOpen(false);
+    setPendingPaymentMethod(null);
+    setPendingOrderId(null);
+    setShortages([]);
+    setShowSuccessModal(true);
+  };
+
+  const handleProcessPayment = async (
+    method: PaymentMethod,
+    overrideStock = false
+  ) => {
+    if (cart.length === 0) return;
+    if (method === "CASH" && !overrideStock && !isEnough) return;
+
+    setIsSubmitting(true);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      let orderId: number;
 
-      // DUMMY 409 ERROR: Kalau Qty > 2 dan belum di-override, munculin peringatan kuning
-      const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
-      if (totalQty > 2 && !overrideStock) {
+      if (pendingOrderId !== null) {
+        orderId = pendingOrderId;
+      } else {
+        const draft = await createDraftOrder();
+
+        if (!draft?.id) {
+          throw new Error("Gagal membuat draft order.");
+        }
+
+        orderId = Number(draft.id);
+        setPendingOrderId(orderId);
+      }
+
+      if (!overrideStock) {
+        const stockResult = await checkOrderStock(orderId);
+
+        if (stockResult.hasShortage) {
+          setPendingPaymentMethod(method);
+          setShortages(stockResult.shortages || []);
+          setIsCashModalOpen(false);
+          setIsQrisModalOpen(false);
+          setIsShortageModalOpen(true);
+          return;
+        }
+      }
+
+      const paymentResult = await payOrder(orderId, method, overrideStock);
+
+      if (paymentResult.kind === "SHORTAGE") {
         setPendingPaymentMethod(method);
+        setShortages(paymentResult.shortages || []);
         setIsCashModalOpen(false);
         setIsQrisModalOpen(false);
         setIsShortageModalOpen(true);
-        return; 
+        return;
       }
 
-      // JIKA SUKSES / DI-OVERRIDE
-      setFinalChange(method === "CASH" ? kembalian : 0);
-      setCart([]);
-      if (method === "CASH") setCashReceived("");
-      setIsCashModalOpen(false);
-      setIsQrisModalOpen(false);
-      setIsShortageModalOpen(false);
-      setShowSuccessModal(true);
-      setPendingPaymentMethod(null);
+      handlePaymentSuccess(method);
     } catch (error) {
       console.error("Gagal memproses pembayaran", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Gagal memproses pembayaran."
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -243,28 +440,44 @@ export default function POSPage() {
             </p>
           </div>
 
-          <div className="flex-1 max-w-sm md:max-w-md lg:max-w-xl mx-2 md:mx-4 relative">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-kanovi-wood dark:text-kanovi-cream/50">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="w-4 h-4"
-              >
-                <circle cx="11" cy="11" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-              </svg>
-            </span>
-            <input
-              type="text"
-              placeholder="Cari menu..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-kanovi-bone dark:bg-kanovi-dark border border-kanovi-cream/50 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-kanovi-wood text-kanovi-coffee dark:text-kanovi-bone"
-            />
+          <div className="flex-1 max-w-sm md:max-w-md lg:max-w-2xl mx-2 md:mx-4">
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-kanovi-wood dark:text-kanovi-cream/50">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="w-4 h-4"
+                  >
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                </span>
+                <input
+                  type="text"
+                  placeholder="Cari menu..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-kanovi-bone dark:bg-kanovi-dark border border-kanovi-cream/50 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-kanovi-wood text-kanovi-coffee dark:text-kanovi-bone"
+                />
+              </div>
+
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="px-4 py-2 bg-kanovi-bone dark:bg-kanovi-dark border border-kanovi-cream/50 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-kanovi-wood text-kanovi-coffee dark:text-kanovi-bone min-w-[150px]">
+                <option value="ALL">Semua</option>
+                {categoryOptions.map((cat) => (
+                  <option key={cat.id} value={String(cat.id)}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="flex items-center gap-2 md:gap-3 min-w-max">
@@ -289,20 +502,6 @@ export default function POSPage() {
 
         <main className="flex-1 overflow-y-auto p-3 md:p-4 lg:p-6">
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-3 sm:gap-4">
-            
-            {/* TOMBOL DIMSUM */}
-            <button
-              onClick={openDimsumModal}
-              className="w-full max-w-32 aspect-square mx-auto bg-kanovi-wood text-white rounded-xl p-3 flex flex-col justify-between items-start text-left shadow-sm active:scale-95 transition-all border border-black/5"
-            >
-              <span className="font-bold text-xs leading-tight line-clamp-3">
-                Dimsum
-              </span>
-              <span className="font-medium text-[11px] opacity-90">
-                Input harga
-              </span>
-            </button>
-
             {filteredMenus.map((menu) => (
               <button
                 key={menu.id}
@@ -425,6 +624,19 @@ export default function POSPage() {
         </div>
 
         <div className="px-6 pb-6 pt-2 mt-auto bg-kanovi-paper dark:bg-kanovi-darker border-t border-kanovi-cream/30 dark:border-white/5">
+          <div className="mb-4 pt-4">
+            <label className="block text-xs font-bold uppercase tracking-wide text-kanovi-coffee/70 dark:text-kanovi-cream/70 mb-2">
+              Nama Customer
+            </label>
+            <input
+              type="text"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              placeholder="Opsional"
+              className="w-full px-4 py-3 bg-white dark:bg-black/20 border border-kanovi-cream dark:border-white/10 rounded-xl text-sm text-kanovi-coffee dark:text-kanovi-bone focus:outline-none focus:ring-2 focus:ring-kanovi-wood"
+            />
+          </div>
+
           <div className="flex justify-between items-end mb-4 pt-4">
             <span className="text-kanovi-coffee/80 dark:text-kanovi-cream/80 font-semibold text-sm">
               Total Tagihan
@@ -436,7 +648,7 @@ export default function POSPage() {
           <div className="flex flex-col gap-2.5">
             <button
               onClick={openCashModal}
-              disabled={cart.length === 0}
+              disabled={cart.length === 0 || isSubmitting}
               className="w-full py-3 md:py-3.5 bg-kanovi-wood hover:bg-kanovi-coffee text-white font-bold text-xs md:text-sm rounded-xl shadow-md active:scale-[0.98] transition-all flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg
@@ -452,12 +664,12 @@ export default function POSPage() {
                 <circle cx="12" cy="12" r="2"></circle>
                 <path d="M6 12h.01M18 12h.01"></path>
               </svg>
-              BAYAR TUNAI
+              {isSubmitting ? "MEMPROSES..." : "BAYAR TUNAI"}
             </button>
 
             <button
               onClick={openQrisModal}
-              disabled={cart.length === 0}
+              disabled={cart.length === 0 || isSubmitting}
               className="w-full py-3 md:py-3.5 bg-kanovi-darker dark:bg-black/50 hover:bg-kanovi-coffee dark:hover:bg-kanovi-dark text-white font-bold text-xs md:text-sm rounded-xl shadow-md border border-kanovi-wood/30 active:scale-[0.98] transition-all flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg
@@ -472,13 +684,12 @@ export default function POSPage() {
                 <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
                 <line x1="12" y1="18" x2="12.01" y2="18"></line>
               </svg>
-              QRIS MANUAL
+              {isSubmitting ? "MEMPROSES..." : "QRIS MANUAL"}
             </button>
           </div>
         </div>
       </aside>
 
-      {/* MODAL KONFIRMASI HAPUS KERANJANG */}
       {isClearCartModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-kanovi-paper dark:bg-kanovi-darker rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-kanovi-cream/50 dark:border-white/5 relative">
@@ -510,7 +721,6 @@ export default function POSPage() {
         </div>
       )}
 
-      {/* MODAL CASH */}
       {isCashModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-kanovi-paper dark:bg-kanovi-darker rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-kanovi-cream/50 dark:border-white/5 relative">
@@ -579,17 +789,16 @@ export default function POSPage() {
               </span>
             </div>
             <button
-              onClick={() => handleProcessPayment("CASH")} 
-              disabled={!isEnough || cashNum === 0}
+              onClick={() => handleProcessPayment("CASH")}
+              disabled={!isEnough || cashNum === 0 || isSubmitting}
               className="w-full py-4 bg-kanovi-wood hover:bg-kanovi-coffee text-white font-bold rounded-xl shadow-md disabled:opacity-50 transition-colors"
             >
-              Selesaikan Pembayaran
+              {isSubmitting ? "Memproses..." : "Selesaikan Pembayaran"}
             </button>
           </div>
         </div>
       )}
 
-      {/* MODAL QRIS */}
       {isQrisModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-kanovi-paper dark:bg-kanovi-darker rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-kanovi-cream/50 dark:border-white/5 relative">
@@ -615,16 +824,16 @@ export default function POSPage() {
             </div>
 
             <button
-              onClick={() => handleProcessPayment("QRIS")} 
-              className="w-full py-4 bg-kanovi-wood hover:bg-kanovi-coffee text-white font-bold rounded-xl shadow-md transition-colors"
+              onClick={() => handleProcessPayment("QRIS")}
+              disabled={isSubmitting}
+              className="w-full py-4 bg-kanovi-wood hover:bg-kanovi-coffee text-white font-bold rounded-xl shadow-md transition-colors disabled:opacity-50"
             >
-              Konfirmasi Uang Masuk
+              {isSubmitting ? "Memproses..." : "Konfirmasi Uang Masuk"}
             </button>
           </div>
         </div>
       )}
 
-      {/* MODAL PERINGATAN STOCK HABIS (OVERRIDE) */}
       {isShortageModalOpen && (
         <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-kanovi-paper dark:bg-kanovi-darker rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-yellow-500/50 dark:border-yellow-400/30 relative text-center">
@@ -632,36 +841,66 @@ export default function POSPage() {
               <AlertTriangle className="w-8 h-8" />
             </div>
             <h3 className="text-xl font-bold text-kanovi-coffee dark:text-kanovi-bone mb-2">
-              Stok Sistem Habis!
+              Stok Sistem Tidak Cukup
             </h3>
-            <p className="text-sm text-kanovi-coffee/80 dark:text-kanovi-cream/80 mb-6 px-2">
-              Berdasarkan catatan sistem, stok menu ini kurang/habis. Namun, jika kopi fisik masih tersedia di meja bar, Anda dapat melanjutkan transaksi ini.
+            <p className="text-sm text-kanovi-coffee/80 dark:text-kanovi-cream/80 mb-4 px-2">
+              Sistem mendeteksi kekurangan stok. Kalau stok fisik masih ada,
+              transaksi bisa dilanjutkan dengan override.
             </p>
-            
+
+            {shortages.length > 0 && (
+              <div className="mb-5 max-h-40 overflow-y-auto text-left bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-400/20 rounded-xl p-3">
+                <div className="text-xs font-bold mb-2 text-yellow-700 dark:text-yellow-300">
+                  Detail shortage:
+                </div>
+                <div className="space-y-2">
+                  {shortages.map((item) => (
+                    <div
+                      key={item.ingredientId}
+                      className="text-xs text-kanovi-coffee dark:text-kanovi-bone"
+                    >
+                      <div className="font-semibold">{item.ingredientName}</div>
+                      <div>
+                        Stock: {item.stock} {item.unit} · Need: {item.need} {item.unit}
+                      </div>
+                      <div>
+                        Kurang: {item.shortBy} {item.unit}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-3">
-              <button 
-                onClick={() => setIsShortageModalOpen(false)} 
+              <button
+                onClick={() => {
+                  setIsShortageModalOpen(false);
+                  setPendingPaymentMethod(null);
+                  setPendingOrderId(null);
+                  setShortages([]);
+                }}
                 className="flex-1 py-3 bg-kanovi-bone dark:bg-white/5 hover:bg-kanovi-cream/50 dark:hover:bg-white/10 text-kanovi-coffee dark:text-kanovi-bone font-bold rounded-xl transition-colors border border-kanovi-cream/50 dark:border-white/10"
               >
                 Batal Transaksi
               </button>
-              
-              <button 
+
+              <button
                 onClick={() => {
                   if (pendingPaymentMethod) {
-                    handleProcessPayment(pendingPaymentMethod, true); // Override = true
+                    handleProcessPayment(pendingPaymentMethod, true);
                   }
-                }} 
-                className="flex-1 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-xl shadow-md transition-colors"
+                }}
+                disabled={isSubmitting}
+                className="flex-1 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-xl shadow-md transition-colors disabled:opacity-50"
               >
-                Lanjut (Override)
+                {isSubmitting ? "Memproses..." : "Lanjut Override"}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL SUKSES */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-kanovi-paper dark:bg-kanovi-darker rounded-3xl shadow-2xl w-full max-w-sm p-8 text-center border border-kanovi-cream/50 dark:border-white/5">
@@ -693,111 +932,6 @@ export default function POSPage() {
             >
               Pesanan Baru
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL DIMSUM MANUAL */}
-      {isDimsumModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-kanovi-paper dark:bg-kanovi-darker rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-kanovi-cream/50 dark:border-white/5">
-            <div className="flex justify-between items-center mb-5">
-              <h3 className="text-xl font-bold text-kanovi-coffee dark:text-kanovi-bone">
-                Tambah Dimsum
-              </h3>
-              <button
-                onClick={() => setIsDimsumModalOpen(false)}
-                className="text-2xl text-kanovi-coffee dark:text-kanovi-bone opacity-50"
-              >
-                &times;
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold mb-2 text-kanovi-coffee dark:text-kanovi-bone">
-                  Nama
-                </label>
-                <input
-                  type="text"
-                  value={dimsumName}
-                  onChange={(e) => setDimsumName(e.target.value)}
-                  placeholder="Dimsum"
-                  className="w-full px-4 py-3 bg-white dark:bg-black/20 border border-kanovi-cream dark:border-white/10 rounded-xl text-kanovi-coffee dark:text-kanovi-bone"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold mb-2 text-kanovi-coffee dark:text-kanovi-bone">
-                  Harga
-                </label>
-                <input
-                  type="text"
-                  inputMode="none"
-                  readOnly
-                  value={dimsumPrice ? Number(dimsumPrice).toLocaleString("id-ID") : ""}
-                  placeholder="0"
-                  className="w-full px-4 py-3 bg-white dark:bg-black/20 border border-kanovi-cream dark:border-white/10 rounded-xl text-kanovi-coffee dark:text-kanovi-bone text-right text-2xl font-bold"
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                {[10000, 15000, 20000, 25000, 30000, 50000].map((amt) => (
-                  <button
-                    key={amt}
-                    type="button"
-                    onClick={() => setDimsumPrice(String(amt))}
-                    className="py-2 rounded-xl bg-kanovi-cream/30 hover:bg-kanovi-cream/60 dark:bg-white/5 dark:hover:bg-white/10 border border-kanovi-cream dark:border-white/10 text-sm font-bold text-kanovi-coffee dark:text-kanovi-bone"
-                  >
-                    Rp {amt.toLocaleString("id-ID")}
-                  </button>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((num) => (
-                  <button
-                    key={num}
-                    type="button"
-                    onClick={() => appendDimsumDigit(num)}
-                    className="py-3 rounded-xl bg-kanovi-bone dark:bg-black/20 border border-kanovi-cream dark:border-white/10 font-bold text-kanovi-coffee dark:text-kanovi-bone hover:bg-kanovi-cream/50 dark:hover:bg-white/10"
-                  >
-                    {num}
-                  </button>
-                ))}
-
-                <button
-                  type="button"
-                  onClick={clearDimsumDigit}
-                  className="py-3 rounded-xl bg-red-50 border border-red-200 font-bold text-red-600 hover:bg-red-100"
-                >
-                  C
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => appendDimsumDigit("0")}
-                  className="py-3 rounded-xl bg-kanovi-bone dark:bg-black/20 border border-kanovi-cream dark:border-white/10 font-bold text-kanovi-coffee dark:text-kanovi-bone hover:bg-kanovi-cream/50 dark:hover:bg-white/10"
-                >
-                  0
-                </button>
-
-                <button
-                  type="button"
-                  onClick={backspaceDimsumDigit}
-                  className="py-3 rounded-xl bg-kanovi-bone dark:bg-black/20 border border-kanovi-cream dark:border-white/10 font-bold text-kanovi-coffee dark:text-kanovi-bone hover:bg-kanovi-cream/50 dark:hover:bg-white/10"
-                >
-                  ⌫
-                </button>
-              </div>
-
-              <button
-                onClick={handleAddCustomDimsum}
-                className="w-full py-3 bg-kanovi-wood hover:bg-kanovi-coffee text-white font-bold rounded-xl"
-              >
-                Tambah ke Keranjang
-              </button>
-            </div>
           </div>
         </div>
       )}

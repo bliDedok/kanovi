@@ -4,10 +4,20 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 
+type Category = {
+  id: number;
+  name: string;
+  slug: string;
+  isActive?: boolean;
+  sortOrder?: number;
+};
+
 type Menu = {
   id: number;
   name: string;
   price: number;
+  categoryId?: number | null;
+  category?: Category | null;
 };
 
 type Ingredient = {
@@ -26,6 +36,9 @@ type RecipeRow = {
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:3001";
 
 export default function MenuListPage() {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
+  const [editCategoryId, setEditCategoryId] = useState<string>("");
   const hasLoadedRef = useRef(false);
   const [menus, setMenus] = useState<Menu[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -34,9 +47,7 @@ export default function MenuListPage() {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [isRecipeModalOpen, setIsRecipeModalOpen] = useState(false);
   const [selectedMenu, setSelectedMenu] = useState<Menu | null>(null);
-  const [recipeItems, setRecipeItems] = useState<RecipeRow[]>([
-  { ingredientId: "", amountNeeded: "" },
-  ]);
+  const [recipeItems, setRecipeItems] = useState<RecipeRow[]>([ { ingredientId: "", amountNeeded: "" },]);
   const [isRecipeLoading, setIsRecipeLoading] = useState(false);
   const [isRecipeSaving, setIsRecipeSaving] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -44,11 +55,7 @@ export default function MenuListPage() {
   const [editName, setEditName] = useState("");
   const [editPrice, setEditPrice] = useState("");
   const [isEditSaving, setIsEditSaving] = useState(false);
-  const getToken = () =>
-  document.cookie
-    .split("; ")
-    .find((row) => row.startsWith("kanovi_token="))
-    ?.split("=")[1];
+  const getToken = () => document.cookie.split("; ").find((row) => row.startsWith("kanovi_token="))?.split("=")[1];
 
     const apiRequest = async (path: string, options: RequestInit = {}) => {
     const token = getToken();
@@ -77,7 +84,8 @@ export default function MenuListPage() {
 
     return data;
   };
-  
+
+
   const fetchMenus = async () => {
     try {
       const data = await apiRequest("/api/menus");
@@ -87,6 +95,16 @@ export default function MenuListPage() {
       toast.error(error instanceof Error ? error.message : "Gagal mengambil menu");
     }
   };
+
+  const fetchCategories = async () => {
+  try {
+    const data = await apiRequest("/categories");
+    setCategories(Array.isArray(data) ? data : []);
+  } catch (error) {
+    console.error("fetchCategories error:", error);
+    toast.error(error instanceof Error ? error.message : "Gagal mengambil kategori");
+  }
+};
 
   const fetchIngredients = async () => {
   try {
@@ -250,18 +268,20 @@ export default function MenuListPage() {
   };
 
   const openEditModal = (menu: Menu) => {
-      setEditingMenu(menu);
-      setEditName(menu.name);
-      setEditPrice(String(menu.price));
-      setIsEditModalOpen(true);
-    };
+    setEditingMenu(menu);
+    setEditName(menu.name);
+    setEditPrice(String(menu.price));
+    setEditCategoryId(menu.categoryId ? String(menu.categoryId) : "");
+    setIsEditModalOpen(true);
+  };
 
     const closeEditModal = () => {
-      setIsEditModalOpen(false);
-      setEditingMenu(null);
-      setEditName("");
-      setEditPrice("");
-    };
+  setIsEditModalOpen(false);
+  setEditingMenu(null);
+  setEditName("");
+  setEditPrice("");
+  setEditCategoryId("");
+};
 
 
   const handleUpdateMenu = async () => {
@@ -285,12 +305,13 @@ export default function MenuListPage() {
 
     try {
       await apiRequest(`/api/menus/${editingMenu.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          name,
-          price,
-        }),
-      });
+  method: "PUT",
+  body: JSON.stringify({
+    name,
+    price,
+    categoryId: editCategoryId ? Number(editCategoryId) : null,
+  }),
+});
 
       toast.success("Menu berhasil diupdate", { id: toastId });
       closeEditModal();
@@ -306,16 +327,23 @@ export default function MenuListPage() {
   };
 
   useEffect(() => {
-    if (hasLoadedRef.current) return;
-    hasLoadedRef.current = true;
+  if (hasLoadedRef.current) return;
+  hasLoadedRef.current = true;
 
-    fetchMenus();
-    fetchIngredients();
-  }, []);
+  fetchMenus();
+  fetchIngredients();
+  fetchCategories();
+}, []);
 
-  const filteredMenus = menus.filter((menu: any) =>
-    menu.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+const filteredMenus = menus.filter((menu) => {
+  const matchSearch = menu.name.toLowerCase().includes(searchQuery.toLowerCase());
+  const matchCategory =
+    selectedCategory === "ALL"
+      ? true
+      : String(menu.categoryId ?? "") === selectedCategory;
+
+  return matchSearch && matchCategory;
+});
 
   return (
     <div className="max-w-5xl mx-auto w-full relative">
@@ -326,6 +354,20 @@ export default function MenuListPage() {
         </div>
         
         <div className="flex flex-col sm:flex-row w-full lg:w-auto gap-3">
+          <div className="relative w-full sm:w-56">
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="w-full px-4 py-2.5 bg-kanovi-paper dark:bg-kanovi-darker border border-kanovi-cream dark:border-kanovi-darker/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-kanovi-wood text-kanovi-coffee dark:text-kanovi-bone text-sm">
+              <option value="ALL">Semua Kategori</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={String(cat.id)}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          
           {/* SEARCH BAR */}
           <div className="relative w-full sm:w-64">
             <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-kanovi-wood dark:text-kanovi-cream/50">🔍</span>
@@ -336,6 +378,7 @@ export default function MenuListPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 bg-kanovi-paper dark:bg-kanovi-darker border border-kanovi-cream dark:border-kanovi-darker/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-kanovi-wood text-kanovi-coffee dark:text-kanovi-bone placeholder-kanovi-coffee/40 dark:placeholder-kanovi-cream/30 transition-shadow text-sm"
             />
+            
           </div>
 
           {/* TOMBOL TAMBAH MENU (Warna Kayu / Karamel) */}
@@ -358,6 +401,7 @@ export default function MenuListPage() {
                 <th className="p-3 md:p-4 font-bold">ID</th>
                 <th className="p-3 md:p-4 font-bold">Nama Menu</th>
                 <th className="p-3 md:p-4 font-bold">Harga</th>
+                <th className="p-3 md:p-4 font-bold">Kategori</th>
                 <th className="p-3 md:p-4 font-bold text-center">Aksi</th>
               </tr>
             </thead>
@@ -368,7 +412,7 @@ export default function MenuListPage() {
                   <td className="p-3 md:p-4 text-kanovi-coffee/60 dark:text-kanovi-cream/50">#{menu.id}</td>
                   <td className="p-3 md:p-4 font-semibold text-kanovi-coffee dark:text-kanovi-bone">{menu.name}</td>
                   <td className="p-3 md:p-4 text-kanovi-wood dark:text-kanovi-cream">Rp {menu.price.toLocaleString("id-ID")}</td>
-                  
+                  <td className="p-3 md:p-4 text-kanovi-coffee dark:text-kanovi-bone">{menu.category?.name ?? "-"}</td>
                   <td className="p-3 md:p-4 text-center">
                     <div className="flex justify-center items-center gap-2">
                       <button
@@ -397,7 +441,7 @@ export default function MenuListPage() {
               ))}
               {filteredMenus.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="p-6 md:p-8 text-center text-kanovi-coffee/50 dark:text-kanovi-cream/40 italic text-sm md:text-base">
+                  <td colSpan={5} className="p-6 md:p-8 text-center text-kanovi-coffee/50 dark:text-kanovi-cream/40 italic text-sm md:text-base">
                     Menu tidak ditemukan.
                   </td>
                 </tr>
