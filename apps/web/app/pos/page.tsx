@@ -1,5 +1,6 @@
 "use client";
 
+// ====== 1. BAGIAN IMPORTS & TYPES ======
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ShoppingCart, Trash2, AlertTriangle } from "lucide-react";
@@ -42,6 +43,8 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:3001";
 
 export default function POSPage() {
   const router = useRouter();
+
+  // ====== 2. BAGIAN STATE MANAGEMENT ======
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -55,16 +58,18 @@ export default function POSPage() {
   const [finalChange, setFinalChange] = useState(0);
 
   const [isShortageModalOpen, setIsShortageModalOpen] = useState(false);
-  const [pendingPaymentMethod, setPendingPaymentMethod] =
-    useState<PaymentMethod | null>(null);
+  const [pendingPaymentMethod, setPendingPaymentMethod] = useState<PaymentMethod | null>(null);
   const [pendingOrderId, setPendingOrderId] = useState<number | null>(null);
   const [shortages, setShortages] = useState<ShortageItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const [overrideReason, setOverrideReason] = useState("");
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [menus, setMenus] = useState<Menu[]>([]);
 
+  // ====== 3. BAGIAN HELPER & FETCH DATA ======
   const getToken = () =>
     document.cookie
       .split("; ")
@@ -103,6 +108,7 @@ export default function POSPage() {
     }
   };
 
+  // ====== 4. BAGIAN API ORDERS (MODIFIKASI HARDENING & OVERRIDE) ======
   const createDraftOrder = async () => {
     const token = getToken();
 
@@ -110,28 +116,20 @@ export default function POSPage() {
       throw new Error("Token login tidak ditemukan. Silakan login ulang.");
     }
 
-    const payload = decodeJwtPayload(token);
-    const userId = payload?.userId ?? payload?.id;
-
-    if (!userId) {
-      throw new Error("User login tidak valid. Silakan login ulang.");
-    }
-
-    const res = await fetch(`${API_BASE}/orders`, {
+    const res = await fetch(`${API_BASE}/api/orders`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
-      userId,
-      origin: "COUNTER",
-      customerName: customerName.trim() || undefined,
-      items: cart.map((item) => ({
-        menuId: item.id,
-        qty: item.qty,
-      })),
-    }),
+        origin: "COUNTER",
+        customerName: customerName.trim() || undefined,
+        items: cart.map((item) => ({
+          menuId: item.id,
+          qty: item.qty,
+        })),
+      }),
     });
 
     const data = await res.json().catch(() => null);
@@ -150,7 +148,7 @@ export default function POSPage() {
       throw new Error("Token login tidak ditemukan. Silakan login ulang.");
     }
 
-    const res = await fetch(`${API_BASE}/orders/${orderId}/stock-check`, {
+    const res = await fetch(`${API_BASE}/api/orders/${orderId}/stock-check`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -168,11 +166,12 @@ export default function POSPage() {
       shortages: ShortageItem[];
     };
   };
-
+  
   const payOrder = async (
     orderId: number,
     method: PaymentMethod,
-    overrideStock = false
+    overrideStock = false,
+    reason?: string 
   ) => {
     const token = getToken();
 
@@ -180,7 +179,7 @@ export default function POSPage() {
       throw new Error("Token login tidak ditemukan. Silakan login ulang.");
     }
 
-    const res = await fetch(`${API_BASE}/orders/${orderId}/pay`, {
+    const res = await fetch(`${API_BASE}/api/orders/${orderId}/pay`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -189,7 +188,7 @@ export default function POSPage() {
       body: JSON.stringify({
         paymentMethod: method,
         overrideStock,
-        overrideNote: overrideStock ? "Override dari POS" : undefined,
+        overrideNote: overrideStock ? (reason || "Override tanpa alasan spesifik") : undefined,
       }),
     });
 
@@ -212,6 +211,7 @@ export default function POSPage() {
     };
   };
 
+  // ====== 5. BAGIAN LOGIKA KERANJANG (CART) & UI LOGIC ======
   const openCashModal = () => {
     setCashReceived("");
     setIsCashModalOpen(true);
@@ -309,33 +309,33 @@ export default function POSPage() {
   );
 
   const categoryOptions = useMemo(() => {
-  const map = new Map<number, { id: number; name: string; slug: string }>();
+    const map = new Map<number, { id: number; name: string; slug: string }>();
 
-  menus.forEach((menu) => {
-    if (menu.category?.id) {
-      map.set(menu.category.id, {
-        id: menu.category.id,
-        name: menu.category.name,
-        slug: menu.category.slug,
-      });
-    }
-  });
+    menus.forEach((menu) => {
+      if (menu.category?.id) {
+        map.set(menu.category.id, {
+          id: menu.category.id,
+          name: menu.category.name,
+          slug: menu.category.slug,
+        });
+      }
+    });
 
-  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-}, [menus]);
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [menus]);
 
   const filteredMenus = (Array.isArray(menus) ? menus : []).filter((menu) => {
-  const matchSearch = menu.name
-    .toLowerCase()
-    .includes(searchQuery.toLowerCase());
+    const matchSearch = menu.name
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase());
 
-  const matchCategory =
-    selectedCategory === "ALL"
-      ? true
-      : String(menu.category?.id ?? "") === selectedCategory;
+    const matchCategory =
+      selectedCategory === "ALL"
+        ? true
+        : String(menu.category?.id ?? "") === selectedCategory;
 
-  return matchSearch && matchCategory;
-});
+    return matchSearch && matchCategory;
+  });
 
   const cashNum = parseInt(cashReceived.replace(/[^0-9]/g, "")) || 0;
   const kembalian = cashNum - totalTagihan;
@@ -351,11 +351,13 @@ export default function POSPage() {
     .sort((a, b) => a - b)
     .slice(0, 4);
 
+  // ====== 6. BAGIAN HANDLER TRANSAKSI ======
   const handlePaymentSuccess = (method: PaymentMethod) => {
     setFinalChange(method === "CASH" ? Math.max(kembalian, 0) : 0);
     setCart([]);
     setCustomerName("");
     setCashReceived("");
+    setOverrideReason(""); // MODIFIKASI: Reset alasan saat transaksi sukses
     setIsCashModalOpen(false);
     setIsQrisModalOpen(false);
     setIsShortageModalOpen(false);
@@ -371,6 +373,12 @@ export default function POSPage() {
   ) => {
     if (cart.length === 0) return;
     if (method === "CASH" && !overrideStock && !isEnough) return;
+
+    // MODIFIKASI: Validasi wajib isi alasan jika melakukan override
+    if (overrideStock && !overrideReason.trim()) {
+      alert("Alasan override wajib diisi!");
+      return; 
+    }
 
     setIsSubmitting(true);
 
@@ -403,7 +411,8 @@ export default function POSPage() {
         }
       }
 
-      const paymentResult = await payOrder(orderId, method, overrideStock);
+      // MODIFIKASI: Kirimkan overrideReason ke fungsi payOrder
+      const paymentResult = await payOrder(orderId, method, overrideStock, overrideReason);
 
       if (paymentResult.kind === "SHORTAGE") {
         setPendingPaymentMethod(method);
@@ -469,7 +478,7 @@ export default function POSPage() {
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="px-4 py-2 bg-kanovi-bone dark:bg-kanovi-dark border border-kanovi-cream/50 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-kanovi-wood text-kanovi-coffee dark:text-kanovi-bone min-w-[150px]">
+                className="px-4 py-2 bg-kanovi-bone dark:bg-kanovi-dark border border-kanovi-cream/50 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-kanovi-wood text-kanovi-coffee dark:text-kanovi-bone min-w-37,5px">
                 <option value="ALL">Semua</option>
                 {categoryOptions.map((cat) => (
                   <option key={cat.id} value={String(cat.id)}>
@@ -834,7 +843,7 @@ export default function POSPage() {
         </div>
       )}
 
-      {isShortageModalOpen && (
+{isShortageModalOpen && (
         <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-kanovi-paper dark:bg-kanovi-darker rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-yellow-500/50 dark:border-yellow-400/30 relative text-center">
             <div className="w-16 h-16 mx-auto bg-yellow-100 dark:bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 rounded-full flex items-center justify-center mb-4">
@@ -849,7 +858,7 @@ export default function POSPage() {
             </p>
 
             {shortages.length > 0 && (
-              <div className="mb-5 max-h-40 overflow-y-auto text-left bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-400/20 rounded-xl p-3">
+              <div className="mb-4 max-h-40 overflow-y-auto text-left bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-400/20 rounded-xl p-3">
                 <div className="text-xs font-bold mb-2 text-yellow-700 dark:text-yellow-300">
                   Detail shortage:
                 </div>
@@ -872,6 +881,20 @@ export default function POSPage() {
               </div>
             )}
 
+            <div className="mb-5 text-left">
+              <label className="block text-sm font-bold text-kanovi-coffee dark:text-kanovi-bone mb-2">
+                Alasan Override <span className="text-red-500">*wajib</span>
+              </label>
+              <textarea
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-kanovi-darker text-kanovi-coffee dark:text-kanovi-bone focus:ring-2 focus:ring-yellow-500 focus:outline-none"
+                placeholder="Cth: Sisa susu di kulkas masih ada..."
+                value={overrideReason}
+                onChange={(e) => setOverrideReason(e.target.value)}
+                rows={2}
+                required
+              />
+            </div>
+
             <div className="flex gap-3">
               <button
                 onClick={() => {
@@ -879,6 +902,7 @@ export default function POSPage() {
                   setPendingPaymentMethod(null);
                   setPendingOrderId(null);
                   setShortages([]);
+                  setOverrideReason(""); 
                 }}
                 className="flex-1 py-3 bg-kanovi-bone dark:bg-white/5 hover:bg-kanovi-cream/50 dark:hover:bg-white/10 text-kanovi-coffee dark:text-kanovi-bone font-bold rounded-xl transition-colors border border-kanovi-cream/50 dark:border-white/10"
               >
@@ -891,8 +915,8 @@ export default function POSPage() {
                     handleProcessPayment(pendingPaymentMethod, true);
                   }
                 }}
-                disabled={isSubmitting}
-                className="flex-1 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-xl shadow-md transition-colors disabled:opacity-50"
+                disabled={isSubmitting || !overrideReason.trim()} 
+                className="flex-1 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-xl shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? "Memproses..." : "Lanjut Override"}
               </button>

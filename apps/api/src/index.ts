@@ -39,7 +39,7 @@ app.patch("/api/ingredients/:id", { preHandler: [verifyToken] }, updateIngredien
 app.post("/api/ingredients/:id/adjust", { preHandler: [verifyToken] }, adjustIngredientStock);
 
 
-app.get("/categories", { preHandler: [verifyToken] }, getAllCategories);
+app.get("/api/categories", { preHandler: [verifyToken] }, getAllCategories);
 app.post("/categories", { preHandler: [verifyToken] }, createCategory);
 app.put("/categories/:id", { preHandler: [verifyToken] }, updateCategory);
 app.delete("/categories/:id", { preHandler: [verifyToken] }, deleteCategory);
@@ -49,13 +49,14 @@ app.get("/api/menus/:id/recipe", { preHandler: [verifyToken] }, getMenuRecipe);
 app.put("/api/menus/:id/recipe", { preHandler: [verifyToken] }, replaceMenuRecipe);
 
 // --- ORDERS ---
+// ====== 1. BAGIAN SCHEMA VALIDASI (ZOD) ======
 const orderItemSchema = z.object({
   menuId: z.number().int().positive(),
   qty: z.number().int().positive(),
 });
 
 const orderCreateSchema = z.object({
-  userId: z.number().int().positive(),
+  // userId: z.number().int().positive(), <--- DIHAPUS: Kita tidak lagi menerima userId dari frontend
   origin: z.enum(["COUNTER", "KITCHEN", "BAR"]),
   customerName: z.string().trim().min(1).optional(),
   items: z.array(orderItemSchema).min(1),
@@ -67,6 +68,7 @@ const paySchema = z.object({
   overrideNote: z.string().trim().optional(),
 });
 
+// ====== 2. BAGIAN HELPER FUNGSI STOK ======
 type StockRequirement = {
   ingredientId: number;
   ingredientName: string;
@@ -151,14 +153,22 @@ async function getOrderStockSummary(orderId: number) {
   };
 }
 
-app.post("/orders", { preHandler: [verifyToken] }, async (req, reply) => {
+// ====== 3. BAGIAN CREATE ORDER (HARDENING USER ID) ======
+app.post("/api/orders", { preHandler: [verifyToken] }, async (req, reply) => {
   const parsed = orderCreateSchema.safeParse(req.body);
 
   if (!parsed.success) {
     return reply.code(400).send({ error: parsed.error.flatten() });
   }
 
-  const { userId, origin, customerName, items } = parsed.data;
+  // MODIFIKASI: Ambil userId dari Token (req.user.id), bukan dari body
+  const userId = req.user?.id || req.user?.userId; 
+  
+  if (!userId) {
+    return reply.code(401).send({ error: "Unauthorized: User ID tidak ditemukan dalam token." });
+  }
+
+  const { origin, customerName, items } = parsed.data;
 
   const menus = await prisma.menu.findMany({
     where: { id: { in: items.map((i) => i.menuId) } },
@@ -186,7 +196,7 @@ app.post("/orders", { preHandler: [verifyToken] }, async (req, reply) => {
 
   const order = await prisma.order.create({
     data: {
-      userId,
+      userId: Number(userId), // Gunakan userId dari token
       origin,
       customerName,
       totalPrice,
@@ -201,7 +211,8 @@ app.post("/orders", { preHandler: [verifyToken] }, async (req, reply) => {
   return order;
 });
 
-app.get("/orders/:id/stock-check", { preHandler: [verifyToken] }, async (req, reply) => {
+// ====== 4. BAGIAN STOCK CHECK ======
+app.get("/api/orders/:id/stock-check", { preHandler: [verifyToken] }, async (req, reply) => {
   const id = Number((req.params as any).id);
 
   if (!Number.isFinite(id)) {
@@ -223,7 +234,8 @@ app.get("/orders/:id/stock-check", { preHandler: [verifyToken] }, async (req, re
   };
 });
 
-app.post("/orders/:id/pay", { preHandler: [verifyToken] }, async (req, reply) => {
+// ====== 5. BAGIAN PAYMENT & QUEUE STATION ======
+app.post("/api/orders/:id/pay", { preHandler: [verifyToken] }, async (req, reply) => {
   const parsed = paySchema.safeParse(req.body);
 
   if (!parsed.success) {
@@ -232,6 +244,9 @@ app.post("/orders/:id/pay", { preHandler: [verifyToken] }, async (req, reply) =>
 
   const { paymentMethod, overrideStock, overrideNote } = parsed.data;
   const id = Number((req.params as any).id);
+
+  // Ambil ID Kasir dari Token untuk dicatat sebagai "Actor" jika terjadi override
+  const actorId = req.user?.id || req.user?.userId;
 
   if (!Number.isFinite(id)) {
     return reply.code(400).send({ error: "Invalid id" });
@@ -301,6 +316,7 @@ app.post("/orders/:id/pay", { preHandler: [verifyToken] }, async (req, reply) =>
 
     const didOverride = shortages.length > 0 && overrideStock;
 
+    // UPDATE ORDER: Set Payment PAID dan ubah Status menjadi IN_QUEUE
     const paidOrder = await tx.order.update({
       where: { id: lockedOrder.id },
       data: {
