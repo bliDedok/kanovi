@@ -1,20 +1,42 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import jwt from 'jsonwebtoken';
 
-export const verifyToken = async (req: FastifyRequest, reply: FastifyReply) => {
-  // Ambil header Authorization (biasanya formatnya: "Bearer eyJhbGci...")
-  const authHeader = req.headers['authorization'];
+// 1. Sesuaikan Payload dengan tipe data di fastify.d.ts (id menggunakan number)
+interface JwtPayload {
+  id?: number;
+  userId?: number;
+  role?: string;
+  username?: string;
+}
+
+export const verifyToken = async (request: FastifyRequest, reply: FastifyReply) => {
+  const authHeader = request.headers['authorization'];
   
-  if (!authHeader) {
-    return reply.code(401).send({ message: "Akses ditolak. Token tidak ditemukan." });
+  // 2. Validasi ganda: Pastikan header ada DAN formatnya benar berawalan "Bearer "
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return reply.code(401).send({ 
+      success: false, 
+      message: "Akses ditolak. Token tidak ditemukan atau format salah." 
+    });
   }
 
-  const token = authHeader.split(' ')[1]; // Ambil tokennya saja tanpa kata "Bearer"
+  // 3. Ambil token aslinya
+  const token = authHeader.split(' ')[1];
   
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'rahasia_negara');
-    (req as any).user = decoded; // Simpan data user (id & role) ke request agar bisa dibaca fungsi lain
+    // 4. Verifikasi dan paksa tipe datanya menjadi JwtPayload yang baru
+    const decoded = jwt.verify(
+      token, 
+      process.env.JWT_SECRET || 'rahasia_negara'
+    ) as JwtPayload;
+    
+    // 5. Simpan data hasil decode ke object request. 
+    request.user = decoded; 
+    
   } catch (error) {
-    return reply.code(401).send({ message: "Token tidak valid atau sudah kadaluarsa." });
+    return reply.code(401).send({ 
+      success: false, 
+      message: "Akses ditolak. Token tidak valid atau sudah kadaluarsa." 
+    });
   }
 };
