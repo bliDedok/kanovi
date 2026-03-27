@@ -329,7 +329,7 @@ export default function RecipePage() {
                   ))}
                 </select>
 
-                <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                <div className="space-y-3 max-h-105 overflow-y-auto pr-1">
                   {menus.map((menu) => {
                     const isActive = menu.id === selectedMenuId;
 
