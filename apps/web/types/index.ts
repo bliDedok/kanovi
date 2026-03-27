@@ -65,3 +65,25 @@ export type Ingredient = {
   createdAt?: string;
   updatedAt?: string;
 };
+
+export type RecipeItem = {
+  id: number;
+  ingredientId: number;
+  ingredientName: string;
+  unit: string;
+  amountNeeded: number;
+};
+
+export type MenuRecipeResponse = {
+  menu: {
+    id: number;
+    name: string;
+    price: number;
+  };
+  items: RecipeItem[];
+};
+
+export type RecipePayloadItem = {
+  ingredientId: number;
+  amountNeeded: number;
+};
