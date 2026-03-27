@@ -8,6 +8,8 @@ import { createMenu, getAllMenus, updateMenu, getMenuById,deleteMenu } from './c
 import {getAllIngredients, getLowStockIngredients, createIngredient, updateIngredient, adjustIngredientStock, } from "./controllers/ingredientController";
 import { getMenuRecipe, replaceMenuRecipe } from "./controllers/recipeController";
 import { getAllCategories,createCategory, updateCategory, deleteCategory, } from "./controllers/categoryController";
+import { getActiveQueue, updateOrderStatus, getOrderHistory } from "./controllers/queueController";
+
 
 
 const port = Number(process.env.PORT ?? 3001);
@@ -38,8 +40,8 @@ app.post("/api/ingredients", { preHandler: [verifyToken] }, createIngredient);
 app.patch("/api/ingredients/:id", { preHandler: [verifyToken] }, updateIngredient);
 app.post("/api/ingredients/:id/adjust", { preHandler: [verifyToken] }, adjustIngredientStock);
 
-
-app.get("/api/categories", { preHandler: [verifyToken] }, getAllCategories);
+// --- CATEGORIES ---
+app.get("/categories", { preHandler: [verifyToken] }, getAllCategories);
 app.post("/categories", { preHandler: [verifyToken] }, createCategory);
 app.put("/categories/:id", { preHandler: [verifyToken] }, updateCategory);
 app.delete("/categories/:id", { preHandler: [verifyToken] }, deleteCategory);
@@ -54,6 +56,11 @@ const orderItemSchema = z.object({
   menuId: z.number().int().positive(),
   qty: z.number().int().positive(),
 });
+
+// --- QUEUE STATION (KITCHEN/BAR) ---
+app.get("/api/queue", { preHandler: [verifyToken] }, getActiveQueue);
+app.patch("/api/queue/:id/status", { preHandler: [verifyToken] }, updateOrderStatus);
+app.get("/api/orders/history", { preHandler: [verifyToken] }, getOrderHistory);
 
 const orderCreateSchema = z.object({
   // userId: z.number().int().positive(), <--- DIHAPUS: Kita tidak lagi menerima userId dari frontend
@@ -161,7 +168,7 @@ app.post("/api/orders", { preHandler: [verifyToken] }, async (req, reply) => {
     return reply.code(400).send({ error: parsed.error.flatten() });
   }
 
-  // MODIFIKASI: Ambil userId dari Token (req.user.id), bukan dari body
+
   const userId = req.user?.id || req.user?.userId; 
   
   if (!userId) {
