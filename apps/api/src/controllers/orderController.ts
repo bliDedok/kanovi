@@ -124,6 +124,11 @@ export const createOrder = async (req: FastifyRequest, reply: FastifyReply) => {
 
   const menus = await prisma.menu.findMany({
     where: { id: { in: items.map((i) => i.menuId) } },
+    select: {
+      id: true,
+      price: true,
+      prepStation: true,
+    },
   });
 
   const menuMap = new Map(menus.map((m) => [m.id, m]));
@@ -133,14 +138,16 @@ export const createOrder = async (req: FastifyRequest, reply: FastifyReply) => {
   }
 
   const details = items.map((i) => {
-    const menu = menuMap.get(i.menuId)!;
-    const subtotal = menu.price * i.qty;
+  const menu = menuMap.get(i.menuId)!;
+  const subtotal = menu.price * i.qty;
 
     return {
       menuId: menu.id,
       qty: i.qty,
       price: menu.price,
       subtotal,
+      prepStation: menu.prepStation,
+      prepStatus: "PENDING" as const,
     };
   });
 

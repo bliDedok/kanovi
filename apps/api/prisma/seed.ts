@@ -97,19 +97,37 @@ async function main() {
   const menuKopiSusu = await prisma.menu.upsert({
     where: { id: 1 },
     update: {},
-    create: { id: 1, name: 'Es Kopi Susu Kanovi', price: 20000, categoryId: catMinuman.id },
+    create: {
+      id: 1,
+      name: "Es Kopi Susu Kanovi",
+      price: 20000,
+      categoryId: catMinuman.id,
+      prepStation: "KITCHEN",
+    },
   });
 
   const menuTehManis = await prisma.menu.upsert({
     where: { id: 2 },
     update: {},
-    create: { id: 2, name: 'Es Teh Manis', price: 12000, categoryId: catMinuman.id },
+    create: {
+      id: 2,
+      name: "Es Teh Manis",
+      price: 12000,
+      categoryId: catMinuman.id,
+      prepStation: "KITCHEN",
+    },
   });
 
   const menuRotiBakar = await prisma.menu.upsert({
     where: { id: 3 },
     update: {},
-    create: { id: 3, name: 'Roti Bakar Coklat', price: 18000, categoryId: catMakanan.id },
+    create: {
+      id: 3,
+      name: "Roti Bakar Coklat",
+      price: 18000,
+      categoryId: catMakanan.id,
+      prepStation: "KITCHEN",
+    },
   });
 
 

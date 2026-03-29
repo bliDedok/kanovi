@@ -1,10 +1,13 @@
 import { FastifyInstance } from "fastify";
 import { verifyToken } from "../middleware/authMiddleware";
-import { getActiveQueue, updateOrderStatus, getOrderHistory } from "../controllers/queueController";
+import {
+  getActiveQueue,
+  updateOrderItemStatus,
+  getOrderHistory,
+} from "../controllers/queueController";
 
 export default async function queueRoutes(app: FastifyInstance) {
-  // Menggunakan prefix /api di index.ts nanti, jadi di sini tulis rutenya langsung
   app.get("/queue", { preHandler: [verifyToken] }, getActiveQueue);
-  app.patch("/queue/:id/status", { preHandler: [verifyToken] }, updateOrderStatus);
+  app.patch("/queue/items/:detailId/status", { preHandler: [verifyToken] }, updateOrderItemStatus);
   app.get("/orders/history", { preHandler: [verifyToken] }, getOrderHistory);
 }

@@ -1,5 +1,14 @@
 export type PaymentMethod = "CASH" | "QRIS";
 
+export type PrepStation = "KITCHEN" | "BAR";
+
+export type PrepStatus =
+  | "PENDING"
+  | "ACCEPTED"
+  | "STARTED"
+  | "READY"
+  | "SERVED";
+
 export type Category = {
   id: number;
   name: string;
@@ -12,6 +21,7 @@ export type Menu = {
   price: number;
   categoryId?: number | null;
   category?: Category | null;
+  prepStation: PrepStation;
 };
 
 export type CartItem = Menu & {
@@ -20,16 +30,24 @@ export type CartItem = Menu & {
 
 export type OrderDetail = {
   id: number;
+  orderId: number;
+  menuId: number;
   qty: number;
   price: number;
   subtotal: number;
+  prepStation: PrepStation;
+  prepStatus: PrepStatus;
+  acceptedAt?: string | null;
+  startedAt?: string | null;
+  readyAt?: string | null;
+  servedAt?: string | null;
   menu: Menu;
 };
 
 export type Order = {
   id: number;
   customerName: string | null;
-  status: "NEW" | "IN_PROGRESS" | "READY" | "DONE";
+  status: "NEW" | "IN_PROGRESS" | "READY" | "DONE" | "CANCELED";
   paymentStatus: "UNPAID" | "PAID" | "VOID";
   paymentMethod?: PaymentMethod | null;
   totalPrice: number;
@@ -79,6 +97,7 @@ export type MenuRecipeResponse = {
     id: number;
     name: string;
     price: number;
+    prepStation: PrepStation;
   };
   items: RecipeItem[];
 };

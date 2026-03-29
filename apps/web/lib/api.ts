@@ -36,21 +36,22 @@ export const fetchApi = async (endpoint: string, options: RequestInit = {}) => {
 export const api = {
   getMenus: () => fetchApi("/api/menus"),
 
-  getQueue: (station?: string) =>
-    fetchApi(station ? `/api/queue?station=${station}` : "/api/queue"),
+  getQueue: (station: "KITCHEN" | "BAR" = "KITCHEN") =>
+    fetchApi(`/api/queue?station=${station}`),
 
-  updateOrderStatus: (id: number, status: string) =>
-    fetchApi(`/api/queue/${id}/status`, {
+  updateOrderItemStatus: (
+    detailId: number,
+    status: "ACCEPTED" | "STARTED" | "READY" | "SERVED"
+  ) =>
+    fetchApi(`/api/queue/items/${detailId}/status`, {
       method: "PATCH",
       body: JSON.stringify({ status }),
     }),
 
   getHistory: () => fetchApi("/api/orders/history"),
 
-  // API untuk manajemen bahan baku
   getIngredients: () => fetchApi("/api/ingredients"),
 
-  // API untuk recipe menu
   getMenuRecipe: (menuId: number) =>
     fetchApi(`/api/menus/${menuId}/recipe`),
 
@@ -75,14 +76,12 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  // Fungsi untuk menyesuaikan stok bahan baku
   adjustStock: (id: number, qtyChange: number, reason: string) =>
     fetchApi(`/api/ingredients/${id}/adjust`, {
       method: "POST",
       body: JSON.stringify({ qtyChange, reason }),
     }),
 
-  // API untuk manajemen pesanan
   createOrder: (data: { origin: string; customerName?: string; items: any[] }) =>
     fetchApi("/api/orders", {
       method: "POST",

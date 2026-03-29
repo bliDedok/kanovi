@@ -46,6 +46,19 @@ enum StockReason {
   SPOIL
 }
 
+enum PrepStation {
+  KITCHEN
+  BAR
+}
+
+enum PrepStatus {
+  PENDING
+  ACCEPTED
+  STARTED
+  READY
+  SERVED
+}
+
 model User {
   id        Int      @id @default(autoincrement())
   name      String
@@ -70,15 +83,18 @@ model Category {
 }
 
 model Menu {
-  id         Int        @id @default(autoincrement())
-  name       String
-  price      Int
-  categoryId Int?
-  category   Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  recipes    Recipe[]
-  details    OrderDetail[]
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  id          Int          @id @default(autoincrement())
+  name        String
+  price       Int
+  categoryId  Int?
+  prepStation PrepStation  @default(KITCHEN)
+
+  category    Category?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  recipes     Recipe[]
+  details     OrderDetail[]
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 }
 
 model Ingredient {
@@ -138,14 +154,26 @@ model Order {
 }
 
 model OrderDetail {
-  id       Int   @id @default(autoincrement())
-  orderId  Int
-  menuId   Int
-  qty      Int
-  price    Int // snapshot harga saat transaksi
-  subtotal Int
-  order    Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  menu     Menu  @relation(fields: [menuId], references: [id])
+  id          Int         @id @default(autoincrement())
+  orderId     Int
+  menuId      Int
+  qty         Int
+  price       Int
+  subtotal    Int
+
+  prepStation PrepStation @default(KITCHEN)
+  prepStatus  PrepStatus  @default(PENDING)
+
+  acceptedAt  DateTime?
+  startedAt   DateTime?
+  readyAt     DateTime?
+  servedAt    DateTime?
+
+  order       Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menu        Menu        @relation(fields: [menuId], references: [id])
+
+  @@index([orderId])
+  @@index([prepStation, prepStatus])
 }
 
 // Ledger pergerakan stok biar bisa audit
