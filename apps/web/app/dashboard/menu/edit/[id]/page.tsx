@@ -114,7 +114,7 @@ export default function EditMenuPage() {
 
     try {
       const res = await fetch(`${API_BASE}/api/menus/${id}`, {
-        method: "PUT",
+        method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,

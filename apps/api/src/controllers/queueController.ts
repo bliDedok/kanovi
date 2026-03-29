@@ -3,9 +3,32 @@
 import { FastifyRequest, FastifyReply } from "fastify";
 import { prisma } from "../prisma";
 
+// helper untuk derive status order
+function deriveOrderStatus(
+  details: Array<{ prepStatus: "PENDING" | "ACCEPTED" | "STARTED" | "READY" | "SERVED" }>
+): "NEW" | "IN_PROGRESS" | "READY" | "DONE" {
+  if (details.length === 0) return "NEW";
+
+  const allServed = details.every((d) => d.prepStatus === "SERVED");
+  if (allServed) return "DONE";
+
+  const allReadyOrServed = details.every(
+    (d) => d.prepStatus === "READY" || d.prepStatus === "SERVED"
+  );
+  if (allReadyOrServed) return "READY";
+
+  const hasStartedWork = details.some((d) =>
+    ["ACCEPTED", "STARTED", "READY", "SERVED"].includes(d.prepStatus)
+  );
+  if (hasStartedWork) return "IN_PROGRESS";
+
+  return "NEW";
+}
+
 // ====== 1. API LIST QUEUE PER STATION ======
 export const getActiveQueue = async (request: FastifyRequest, reply: FastifyReply) => {
-  const { station } = request.query as { station?: string };
+  const rawStation = (request.query as { station?: string }).station;
+  const station = rawStation === "BAR" ? "BAR" : "KITCHEN";
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -14,43 +37,31 @@ export const getActiveQueue = async (request: FastifyRequest, reply: FastifyRepl
     const orders = await prisma.order.findMany({
       where: {
         paymentStatus: "PAID",
-        status: { in: ["NEW", "IN_PROGRESS", "READY"] },
-        orderedAt: { gte: today }, 
+        orderedAt: { gte: today },
+        details: {
+          some: {
+            prepStation: station,
+            prepStatus: { not: "SERVED" },
+          },
+        },
       },
       include: {
+        user: true,
         details: {
-          include: {
-            menu: {
-              include: { category: true },
-            },
+          where: {
+            prepStation: station,
+            prepStatus: { not: "SERVED" },
           },
+          include: {
+            menu: { include: { category: true } },
+          },
+          orderBy: { id: "asc" },
         },
       },
       orderBy: { orderedAt: "asc" },
     });
 
-    const mappedOrders = orders.map((order) => {
-      let filteredDetails = order.details;
-
-      if (station === "BAR") {
-        filteredDetails = order.details.filter((d) => {
-          const catName = d.menu.category?.name.toLowerCase() || "";
-          return catName.includes("minum") || catName.includes("kopi") || catName.includes("teh");
-        });
-      } else if (station === "KITCHEN") {
-        filteredDetails = order.details.filter((d) => {
-          const catName = d.menu.category?.name.toLowerCase() || "";
-          return !catName.includes("minum") && !catName.includes("kopi") && !catName.includes("teh");
-        });
-      }
-
-      return {
-        ...order,
-        details: filteredDetails,
-      };
-    }).filter((order) => order.details.length > 0); 
-
-    return reply.send({ success: true, data: mappedOrders });
+    return reply.send({ success: true, data: orders });
   } catch (error) {
     console.error(error);
     return reply.code(500).send({ success: false, message: "Terjadi kesalahan sistem." });
@@ -58,26 +69,83 @@ export const getActiveQueue = async (request: FastifyRequest, reply: FastifyRepl
 };
 
 // ====== 2. API UPDATE STATUS ORDER ======
-export const updateOrderStatus = async (request: FastifyRequest, reply: FastifyReply) => {
-  const { id } = request.params as { id: string };
-  const { status } = request.body as { status: "NEW" | "IN_PROGRESS" | "READY" | "DONE" };
+export const updateOrderItemStatus = async (
+  request: FastifyRequest,
+  reply: FastifyReply
+) => {
+  const { detailId } = request.params as { detailId: string };
+  const { status } = request.body as {
+    status: "ACCEPTED" | "STARTED" | "READY" | "SERVED";
+  };
 
-  // Validasi keamanan: Pastikan status yang dikirim sesuai dengan Enum Prisma
-  const validStatuses = ["NEW", "IN_PROGRESS", "READY", "DONE"];
+  const validStatuses = ["ACCEPTED", "STARTED", "READY", "SERVED"];
   if (!validStatuses.includes(status)) {
-    return reply.code(400).send({ success: false, message: "Status tidak valid" });
+    return reply.code(400).send({ success: false, message: "Status item tidak valid" });
   }
 
   try {
-    const updatedOrder = await prisma.order.update({
-      where: { id: Number(id) },
-      data: { status },
+    const detail = await prisma.orderDetail.findUnique({
+      where: { id: Number(detailId) },
     });
 
-    return reply.send({ success: true, data: updatedOrder });
+    if (!detail) {
+      return reply.code(404).send({ success: false, message: "Item order tidak ditemukan" });
+    }
+
+    const now = new Date();
+
+    const timestampPatch =
+      status === "ACCEPTED"
+        ? { acceptedAt: detail.acceptedAt ?? now }
+        : status === "STARTED"
+        ? {
+            acceptedAt: detail.acceptedAt ?? now,
+            startedAt: detail.startedAt ?? now,
+          }
+        : status === "READY"
+        ? {
+            acceptedAt: detail.acceptedAt ?? now,
+            startedAt: detail.startedAt ?? now,
+            readyAt: detail.readyAt ?? now,
+          }
+        : {
+            acceptedAt: detail.acceptedAt ?? now,
+            startedAt: detail.startedAt ?? now,
+            readyAt: detail.readyAt ?? now,
+            servedAt: detail.servedAt ?? now,
+          };
+
+    const updatedDetail = await prisma.orderDetail.update({
+      where: { id: Number(detailId) },
+      data: {
+        prepStatus: status,
+        ...timestampPatch,
+      },
+      include: {
+        menu: true,
+      },
+    });
+
+    const allDetails = await prisma.orderDetail.findMany({
+      where: { orderId: detail.orderId },
+      select: { prepStatus: true },
+    });
+
+    const nextOrderStatus = deriveOrderStatus(allDetails);
+
+    await prisma.order.update({
+      where: { id: detail.orderId },
+      data: { status: nextOrderStatus },
+    });
+
+    return reply.send({
+      success: true,
+      data: updatedDetail,
+      orderStatus: nextOrderStatus,
+    });
   } catch (error) {
     console.error(error);
-    return reply.code(500).send({ success: false, message: "Gagal mengupdate status order." });
+    return reply.code(500).send({ success: false, message: "Gagal mengupdate item order." });
   }
 };
 
@@ -87,11 +155,16 @@ export const getOrderHistory = async (request: FastifyRequest, reply: FastifyRep
     const orders = await prisma.order.findMany({
       where: { paymentStatus: "PAID" },
       include: {
+        user: true,
         details: {
-          include: { menu: true },
+          include: {
+            menu: {
+              include: { category: true },
+            },
+          },
         },
       },
-      orderBy: { orderedAt: "asc" }, 
+      orderBy: { orderedAt: "desc" },
     });
 
     return reply.send({ success: true, data: orders });

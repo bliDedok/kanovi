@@ -305,7 +305,7 @@ export default function MenuListPage() {
 
     try {
       await apiRequest(`/api/menus/${editingMenu.id}`, {
-  method: "PUT",
+  method: "PATCH",
   body: JSON.stringify({
     name,
     price,
