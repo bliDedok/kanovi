@@ -106,3 +106,15 @@ export type RecipePayloadItem = {
   ingredientId: number;
   amountNeeded: number;
 };
+
+export type EditableRecipeItem = {
+  ingredientId: number;
+  ingredientName: string;
+  unit: string;
+  amountNeeded: number;
+};
+
+export type MenuWithRecipeFlag = Menu & {
+  hasRecipe?: boolean;
+  recipeCount?: number;
+};
