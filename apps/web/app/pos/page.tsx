@@ -2,32 +2,39 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { ShoppingCart, Trash2, Menu as MenuIcon, X, MonitorPlay, History, LogOut, Receipt, Calculator } from "lucide-react";
+import { ShoppingCart, Trash2, Menu as MenuIcon, X, MonitorPlay, History, LogOut, Receipt, Calculator, BookmarkPlus, Library } from "lucide-react";
 import { PaymentMethod, Menu, CartItem, ShortageItem } from "../../types";
 import { api } from "../../lib/api";
-import { ClearCartModal, CashModal, QrisModal, ShortageModal, SuccessModal } from "../components/PosModals";
+// IMPORT HoldBillModal yang baru kita buat
+import { ClearCartModal, CashModal, QrisModal, ShortageModal, SuccessModal, HoldBillModal } from "../components/PosModals";
 import OpeningSessionModal from "../components/OpeningSessionModal";
 import { ExpenseModal, ClosingModal } from "../components/FinanceModals";
 
 export default function POSPage() {
   const router = useRouter();
 
-  // --- SESSION STATES ---
   const [activeSession, setActiveSession] = useState<any>(null);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
 
-  // --- EXISTING STATES ---
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [customerName, setCustomerName] = useState("");
   const [cashReceived, setCashReceived] = useState("");
+  
   const [isCashModalOpen, setIsCashModalOpen] = useState(false);
   const [isQrisModalOpen, setIsQrisModalOpen] = useState(false);
   const [isClearCartModalOpen, setIsClearCartModalOpen] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [isShortageModalOpen, setIsShortageModalOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isExpenseOpen, setIsExpenseOpen] = useState(false);
+  const [isClosingOpen, setIsClosingOpen] = useState(false);
+  
+  // --- STATE HOLD BILL BARU ---
+  const [holdBills, setHoldBills] = useState<{id: number, customerName: string, cart: CartItem[]}[]>([]);
+  const [isHoldModalOpen, setIsHoldModalOpen] = useState(false);
+
   const [finalChange, setFinalChange] = useState(0);
   const [pendingPaymentMethod, setPendingPaymentMethod] = useState<PaymentMethod | null>(null);
   const [pendingOrderId, setPendingOrderId] = useState<number | null>(null);
@@ -36,14 +43,10 @@ export default function POSPage() {
   const [overrideReason, setOverrideReason] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [menus, setMenus] = useState<Menu[]>([]);
-  const [isExpenseOpen, setIsExpenseOpen] = useState(false);
-  const [isClosingOpen, setIsClosingOpen] = useState(false);
 
-  // --- LOGIC: CEK SESI (DIPERBAIKI) ---
   const checkSession = async (branchName: string) => {
     try {
       setIsCheckingSession(true);
-      // Sekarang ngecek ke server sesuai cabang yang tersimpan di tablet masing-masing
       const session = await api.getActiveSession(branchName);
       setActiveSession(session);
     } catch (err) { 
@@ -54,15 +57,13 @@ export default function POSPage() {
   };
 
   useEffect(() => {
-    // AMBIL CABANG DARI MEMORI TABLET (Samsung Diah = PUSAT, iPad Nata = RESTART)
-    const savedBranch = localStorage.getItem("kanovi_branch") || "PUSAT";
-    checkSession(savedBranch); 
+    const savedBranch = localStorage.getItem("kanovi_branch");
+    if (savedBranch) { checkSession(savedBranch); } 
+    else { setIsCheckingSession(false); }
     
     const loadMenus = async () => {
-      try {
-        const data = await api.getMenus();
-        setMenus(Array.isArray(data) ? data : []);
-      } catch (error) { console.error(error); }
+      try { const data = await api.getMenus(); setMenus(Array.isArray(data) ? data : []); } 
+      catch (error) { console.error(error); }
     };
     loadMenus();
 
@@ -70,13 +71,20 @@ export default function POSPage() {
     if (savedTheme === "dark" || document.documentElement.classList.contains("dark")) {
       setIsDarkMode(true); document.documentElement.classList.add("dark");
     }
+    
     const savedCart = localStorage.getItem("kanovi_cart");
     if (savedCart) { try { setCart(JSON.parse(savedCart)); } catch { localStorage.removeItem("kanovi_cart"); } }
+
+    // LOAD HOLD BILLS DARI MEMORI
+    const savedHolds = localStorage.getItem("kanovi_hold_bills");
+    if (savedHolds) { try { setHoldBills(JSON.parse(savedHolds)); } catch (e) {} }
   }, []);
 
   useEffect(() => { localStorage.setItem("kanovi_cart", JSON.stringify(cart)); }, [cart]);
+  
+  // SIMPAN HOLD BILLS KE MEMORI TIAP ADA PERUBAHAN
+  useEffect(() => { localStorage.setItem("kanovi_hold_bills", JSON.stringify(holdBills)); }, [holdBills]);
 
-  // --- LOGIC HANDLING ---
   const toggleTheme = () => {
     const isDark = !isDarkMode;
     setIsDarkMode(isDark);
@@ -96,6 +104,30 @@ export default function POSPage() {
     setCart((prev) => prev.map((i) => i.id === id ? { ...i, qty: i.qty + delta } : i).filter((i) => i.qty > 0));
   };
 
+  // --- LOGIC HOLD BILL ---
+  const saveToHold = () => {
+    if (cart.length === 0) return;
+    const newBill = { 
+      id: Date.now(), 
+      customerName: customerName.trim() || `Pelanggan ${holdBills.length + 1}`, 
+      cart: [...cart] 
+    };
+    setHoldBills(prev => [...prev, newBill]);
+    setCart([]); 
+    setCustomerName("");
+  };
+
+  const loadFromHold = (bill: any) => {
+    if (cart.length > 0) {
+      alert("⚠️ Keranjang saat ini masih terisi! Selesaikan pembayaran atau 'Simpan Bill' ini terlebih dahulu sebelum memanggil bill lain.");
+      return;
+    }
+    setCart(bill.cart);
+    setCustomerName(bill.customerName);
+    setHoldBills(prev => prev.filter(b => b.id !== bill.id));
+    setIsHoldModalOpen(false);
+  };
+
   const handleProcessPayment = async (method: PaymentMethod, override = false) => {
     if (!activeSession) return alert("Sesi Kasir belum dibuka!");
     if (cart.length === 0 || isSubmitting) return;
@@ -107,10 +139,8 @@ export default function POSPage() {
       if (pendingOrderId !== null) { orderId = pendingOrderId; } 
       else {
         const draft = await api.createOrder({
-          origin: "COUNTER", 
-          customerName: customerName.trim() || undefined,
-          branch: activeSession.branch, 
-          sessionId: activeSession.id, 
+          origin: "COUNTER", customerName: customerName.trim() || undefined,
+          branch: activeSession.branch, sessionId: activeSession.id, 
           items: cart.map((item) => ({ menuId: item.id, qty: item.qty })),
         });
         orderId = Number(draft.id); setPendingOrderId(orderId);
@@ -125,9 +155,7 @@ export default function POSPage() {
         }
       }
 
-      await api.payOrder(orderId, {
-        paymentMethod: method, overrideStock: override, overrideNote: override ? overrideReason : undefined,
-      });
+      await api.payOrder(orderId, { paymentMethod: method, overrideStock: override, overrideNote: override ? overrideReason : undefined });
 
       const total = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
       const cashNumInput = parseInt(cashReceived.replace(/[^0-9]/g, "")) || 0;
@@ -135,17 +163,11 @@ export default function POSPage() {
       setCart([]); setCustomerName(""); setCashReceived(""); setOverrideReason(""); 
       setIsCashModalOpen(false); setIsQrisModalOpen(false); setIsShortageModalOpen(false);
       setPendingOrderId(null); setShowSuccessModal(true);
-    } catch (error: any) {
-      alert(error.message);
-    } finally { setIsSubmitting(false); }
+    } catch (error: any) { alert(error.message); } finally { setIsSubmitting(false); }
   };
 
-  // --- MEMOS ---
   const totalTagihan = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
-  const filteredMenus = menus.filter((menu) => 
-    menu.name.toLowerCase().includes(searchQuery.toLowerCase()) && 
-    (selectedCategory === "ALL" || String(menu.category?.id ?? "") === selectedCategory)
-  );
+  const filteredMenus = menus.filter((menu) => menu.name.toLowerCase().includes(searchQuery.toLowerCase()) && (selectedCategory === "ALL" || String(menu.category?.id ?? "") === selectedCategory));
   const categoryOptions = useMemo(() => {
     const map = new Map();
     menus.forEach((menu) => { if (menu.category?.id) map.set(menu.category.id, menu.category); });
@@ -160,11 +182,7 @@ export default function POSPage() {
     <div className="flex h-screen bg-kanovi-bone dark:bg-kanovi-dark transition-colors duration-300 font-sans overflow-hidden relative">
       
       {!activeSession && !isCheckingSession && (
-        <OpeningSessionModal onOpenSuccess={(session) => {
-          setActiveSession(session);
-          // Penting: Simpan cabang di memori tablet agar saat refresh tidak kembali ke modal
-          localStorage.setItem("kanovi_branch", session.branch);
-        }} />
+        <OpeningSessionModal onOpenSuccess={(session) => { setActiveSession(session); localStorage.setItem("kanovi_branch", session.branch); }} />
       )}
 
       {isCheckingSession && (
@@ -213,10 +231,39 @@ export default function POSPage() {
       </div>
 
       <aside className="w-72 md:w-80 lg:w-96 shrink-0 bg-kanovi-paper dark:bg-kanovi-darker border-l border-kanovi-cream/50 dark:border-white/5 flex flex-col shadow-2xl z-20">
-        <div className="h-16 flex items-center justify-between px-4 sm:px-5 pt-2 shrink-0">
-          <h2 className="font-bold text-base md:text-lg text-kanovi-coffee dark:text-white flex items-center gap-2"><ShoppingCart className="w-5 h-5"/> Keranjang</h2>
-          {cart.length > 0 && <button onClick={() => setIsClearCartModalOpen(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /><span>Bersihkan</span></button>}
+        <div className="flex flex-col px-4 sm:px-5 pt-4 pb-3 shrink-0 border-b border-kanovi-cream/30 dark:border-white/5">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-bold text-base md:text-lg text-kanovi-coffee dark:text-white flex items-center gap-2"><ShoppingCart className="w-5 h-5"/> Keranjang</h2>
+            {cart.length > 0 && (
+              <button onClick={() => setIsClearCartModalOpen(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors">
+                <Trash2 className="w-4 h-4" /><span>Batal</span>
+              </button>
+            )}
+          </div>
+          
+          {/* TOMBOL HOLD BILL UI */}
+          <div className="flex gap-2">
+            <button 
+              onClick={saveToHold} 
+              disabled={cart.length === 0}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[10px] font-black uppercase tracking-widest bg-yellow-50 dark:bg-yellow-500/10 text-yellow-600 rounded-xl hover:bg-yellow-100 dark:hover:bg-yellow-500/20 disabled:opacity-40 transition-colors shadow-sm"
+            >
+              <BookmarkPlus className="w-3.5 h-3.5" /> Simpan Bill
+            </button>
+            <button 
+              onClick={() => setIsHoldModalOpen(true)}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[10px] font-black uppercase tracking-widest bg-blue-50 dark:bg-blue-500/10 text-blue-600 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors shadow-sm relative"
+            >
+              <Library className="w-3.5 h-3.5" /> Daftar Hold
+              {holdBills.length > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white w-4 h-4 rounded-full flex items-center justify-center text-[9px] animate-bounce shadow-md">
+                  {holdBills.length}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
+
         <div className="flex-1 overflow-y-auto px-6 flex flex-col">
           {cart.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center opacity-30 text-kanovi-coffee dark:text-white gap-4"><ShoppingCart className="w-16 h-16" /><p className="text-sm font-medium">Belum ada pesanan</p></div>
@@ -260,22 +307,17 @@ export default function POSPage() {
               <button onClick={() => router.push('/queue')} className="w-full flex items-center gap-3 px-4 py-4 rounded-xl hover:bg-yellow-500/10 text-kanovi-coffee dark:text-white hover:text-yellow-600 font-semibold transition-colors"><MonitorPlay className="w-5 h-5" /> Layar Antrian</button>
               <button onClick={() => router.push('/history')} className="w-full flex items-center gap-3 px-4 py-4 rounded-xl hover:bg-kanovi-bone dark:hover:bg-white/5 text-kanovi-coffee dark:text-white font-semibold transition-colors"><History className="w-5 h-5" /> Riwayat Transaksi</button>
               
-              <button 
-                onClick={() => { setIsSidebarOpen(false); setIsExpenseOpen(true); }}
-                className="w-full flex items-center gap-3 px-4 py-4 rounded-xl hover:bg-red-500/10 text-kanovi-coffee dark:text-white hover:text-red-600 font-semibold transition-colors"
-              >
+              <button onClick={() => { setIsSidebarOpen(false); setIsExpenseOpen(true); }} className="w-full flex items-center gap-3 px-4 py-4 rounded-xl hover:bg-red-500/10 text-kanovi-coffee dark:text-white hover:text-red-600 font-semibold transition-colors">
                 <Receipt className="w-5 h-5 text-red-500" /> Catat Pengeluaran
               </button>
-
-              <button 
-                onClick={() => { setIsSidebarOpen(false); setIsClosingOpen(true); }}
-                className="w-full flex items-center gap-3 px-4 py-4 rounded-xl hover:bg-orange-500/10 text-kanovi-coffee dark:text-white hover:text-orange-600 font-semibold transition-colors"
-              >
+              <button onClick={() => { setIsSidebarOpen(false); setIsClosingOpen(true); }} className="w-full flex items-center gap-3 px-4 py-4 rounded-xl hover:bg-orange-500/10 text-kanovi-coffee dark:text-white hover:text-orange-600 font-semibold transition-colors">
                 <Calculator className="w-5 h-5 text-orange-500" /> Tutup Kasir (Closing)
               </button>
             </div>
             <div className="p-4 border-t border-kanovi-cream/30 dark:border-white/5">
-              <button onClick={() => { document.cookie = "kanovi_token=; path=/; max-age=0;"; router.push("/login"); }} className="w-full flex items-center gap-3 px-4 py-4 rounded-xl bg-red-50 text-red-600 font-bold transition-colors"><LogOut className="w-5 h-5" /> Keluar</button>
+              <button onClick={() => { localStorage.removeItem("kanovi_branch"); document.cookie = "kanovi_token=; path=/; max-age=0;"; router.push("/login"); }} className="w-full flex items-center gap-3 px-4 py-4 rounded-xl bg-red-50 text-red-600 font-bold transition-colors">
+                <LogOut className="w-5 h-5" /> Keluar
+              </button>
             </div>
           </div>
         </div>
@@ -288,21 +330,15 @@ export default function POSPage() {
       <ShortageModal isOpen={isShortageModalOpen} shortages={shortages} overrideReason={overrideReason} setOverrideReason={setOverrideReason} isSubmitting={isSubmitting} onCancel={() => setIsShortageModalOpen(false)} onProcess={handleProcessPayment} pendingMethod={pendingPaymentMethod} />
       <SuccessModal isOpen={showSuccessModal} onClose={() => setShowSuccessModal(false)} finalChange={finalChange} />
 
-      <ExpenseModal 
-        isOpen={isExpenseOpen} 
-        onClose={() => setIsExpenseOpen(false)} 
-        sessionId={activeSession?.id} 
-      />
-      <ClosingModal 
-        isOpen={isClosingOpen} 
-        onClose={() => setIsClosingOpen(false)} 
-        sessionId={activeSession?.id} 
-        onClosingSuccess={() => {
-          setActiveSession(null); 
-          setIsClosingOpen(false);
-          document.cookie = "kanovi_token=; path=/; max-age=0;";
-          router.push("/login");
-        }} 
+      <ExpenseModal isOpen={isExpenseOpen} onClose={() => setIsExpenseOpen(false)} sessionId={activeSession?.id} />
+      <ClosingModal isOpen={isClosingOpen} onClose={() => setIsClosingOpen(false)} sessionId={activeSession?.id} onClosingSuccess={() => { setActiveSession(null); setIsClosingOpen(false); localStorage.removeItem("kanovi_branch"); document.cookie = "kanovi_token=; path=/; max-age=0;"; router.push("/login"); }} />
+      
+      {/* RENDER MODAL HOLD BILL */}
+      <HoldBillModal 
+        isOpen={isHoldModalOpen} 
+        onClose={() => setIsHoldModalOpen(false)} 
+        holdBills={holdBills} 
+        onLoadBill={loadFromHold} 
       />
     </div>
   );
