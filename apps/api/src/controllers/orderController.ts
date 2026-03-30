@@ -12,7 +12,6 @@ const orderCreateSchema = z.object({
   origin: z.enum(["COUNTER", "KITCHEN", "BAR"]),
   customerName: z.string().trim().min(1).optional(),
   items: z.array(orderItemSchema).min(1),
-  // --- TAMBAHAN SURGICAL: Agar Zod mengizinkan data ini masuk ---
   branch: z.enum(["PUSAT", "RESTART"]).optional(),
   sessionId: z.number().int().positive().optional(),
 });
@@ -21,6 +20,11 @@ const paySchema = z.object({
   paymentMethod: z.enum(["CASH", "QRIS"]),
   overrideStock: z.boolean().optional().default(false),
   overrideNote: z.string().trim().optional(),
+});
+
+// --- SCHEMA BARU UNTUK VOID ---
+const voidSchema = z.object({
+  pin: z.string().min(1, "PIN wajib diisi"),
 });
 
 // ====== 2. HELPER FUNGSI STOK (TIDAK DISENTUH) ======
@@ -123,7 +127,6 @@ export const createOrder = async (req: FastifyRequest, reply: FastifyReply) => {
     return reply.code(401).send({ error: "Unauthorized: User ID tidak ditemukan dalam token." });
   }
 
-  // --- TAMBAHAN SURGICAL: Ambil data branch & sessionId dari body ---
   const { origin, customerName, items, branch, sessionId } = parsed.data;
 
   const menus = await prisma.menu.findMany({
@@ -163,7 +166,6 @@ export const createOrder = async (req: FastifyRequest, reply: FastifyReply) => {
       origin,
       customerName,
       totalPrice,
-      // --- TAMBAHAN SURGICAL: Simpan data ke kolom DB ---
       branch: branch || "PUSAT",
       sessionId: sessionId || null,
       paymentStatus: "UNPAID",
@@ -176,8 +178,6 @@ export const createOrder = async (req: FastifyRequest, reply: FastifyReply) => {
 
   return reply.send(order);
 };
-
-// --- FUNGSI checkOrderStock & payOrder (TIDAK DISENTUH SAMA SEKALI) ---
 
 export const checkOrderStock = async (req: FastifyRequest, reply: FastifyReply) => {
   const id = Number((req.params as any).id);
@@ -343,4 +343,84 @@ export const payOrder = async (req: FastifyRequest, reply: FastifyReply) => {
     order: txResult.order,
     shortages: txResult.shortages,
   });
+};
+
+// ====== 4. FUNGSI BARU: VOID ORDER ======
+
+export const voidOrder = async (req: FastifyRequest, reply: FastifyReply) => {
+  const parsed = voidSchema.safeParse(req.body);
+
+  if (!parsed.success) {
+    return reply.code(400).send({ error: parsed.error.flatten() });
+  }
+
+  const { pin } = parsed.data;
+  const id = Number((req.params as any).id);
+
+  if (!Number.isFinite(id)) {
+    return reply.code(400).send({ error: "Invalid id" });
+  }
+
+  // Validasi PIN Manager (Bisa diatur di file .env nantinya)
+  const MANAGER_PIN = process.env.MANAGER_PIN || "123456";
+  if (pin !== MANAGER_PIN) {
+    return reply.code(403).send({ error: "PIN Manager Salah. Otorisasi VOID ditolak." });
+  }
+
+  try {
+    const txResult = await prisma.$transaction(async (tx) => {
+      // 1. Kunci Order dan pastikan bisa di-VOID
+      await tx.$executeRawUnsafe(
+        `SELECT id FROM "Order" WHERE id = ${id} FOR UPDATE`
+      );
+
+      const lockedOrder = await tx.order.findUnique({ where: { id } });
+
+      if (!lockedOrder) return { kind: "NOT_FOUND" as const };
+      if (lockedOrder.paymentStatus === "VOID") return { kind: "ALREADY_VOID" as const };
+
+      // 2. Kembalikan Stok (Reverse StockMovement)
+      // Kita cari semua riwayat pengurangan stok untuk order ini
+      const movements = await tx.stockMovement.findMany({ where: { orderId: id } });
+
+      for (const mov of movements) {
+        // Karena waktu penjualan nilainya negatif (contoh: -2), kita buat absolut (positif 2) untuk mengembalikan stok.
+        const amountToReturn = Math.abs(mov.qtyChange);
+
+        await tx.ingredient.update({
+          where: { id: mov.ingredientId },
+          data: { stock: { increment: amountToReturn } },
+        });
+
+        // Catat riwayat pengembalian di StockMovement
+        await tx.stockMovement.create({
+          data: {
+            ingredientId: mov.ingredientId,
+            qtyChange: amountToReturn,
+            reason: "RESTOCK",
+            orderId: id,
+          },
+        });
+      }
+
+      // 3. Update Status Order
+      const voidedOrder = await tx.order.update({
+        where: { id },
+        data: { paymentStatus: "VOID" },
+      });
+
+      return { kind: "SUCCESS" as const, order: voidedOrder };
+    });
+
+    if (txResult.kind === "NOT_FOUND") return reply.code(404).send({ error: "Order tidak ditemukan." });
+    if (txResult.kind === "ALREADY_VOID") return reply.code(400).send({ error: "Order ini sudah pernah di-VOID." });
+
+    return reply.send({
+      ok: true,
+      message: "Transaksi berhasil di-VOID. Stok bahan baku telah dikembalikan ke sistem.",
+      order: txResult.order
+    });
+  } catch (error: any) {
+    return reply.code(500).send({ error: error.message });
+  }
 };
