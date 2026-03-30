@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ArrowLeft, Calendar, Receipt, ChevronRight, Sun, Moon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Order } from "../../types";
 import { api } from "../../lib/api";
-import HistoryCard from "../components/HistoryCard"; // IMPORT KOMPONEN KARTU
+import HistoryCard from "../components/HistoryCard";
 
 export default function HistoryPage() {
   const router = useRouter();
@@ -14,6 +14,36 @@ export default function HistoryPage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
+  // --- 1. EKSTRAK FUNGSI FETCH AGAR BISA DIPANGGIL ULANG ---
+  const fetchHistory = useCallback(async () => {
+    try {
+      const json = await api.getHistory();
+      const orders: Order[] = json.data || [];
+      const groups: Record<string, (Order & { dailyNo: number })[]> = {};
+      
+      orders.forEach((order) => {
+        const dateStr = new Date(order.orderedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+        if (!groups[dateStr]) groups[dateStr] = [];
+        groups[dateStr].push({ ...order, dailyNo: groups[dateStr].length + 1 });
+      });
+
+      for (const date in groups) groups[date].reverse(); 
+
+      setGroupedOrders(groups);
+      const availableDates = Object.keys(groups).reverse();
+      
+      // Jangan timpa selectedDate kalau sudah ada (supaya saat refresh data tidak pindah tab)
+      setSelectedDate(prev => {
+        if (prev && availableDates.includes(prev)) return prev;
+        return availableDates.length > 0 ? availableDates[0] : null;
+      });
+    } catch (error) {
+      console.error("Gagal mengambil history", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     const savedTheme = localStorage.getItem("kanovi_theme");
     if (savedTheme === "dark" || document.documentElement.classList.contains("dark")) {
@@ -21,38 +51,29 @@ export default function HistoryPage() {
       document.documentElement.classList.add("dark");
     }
 
-    const fetchHistory = async () => {
-      try {
-        const json = await api.getHistory();
-        const orders: Order[] = json.data || [];
-        const groups: Record<string, (Order & { dailyNo: number })[]> = {};
-        
-        orders.forEach((order) => {
-          const dateStr = new Date(order.orderedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-          if (!groups[dateStr]) groups[dateStr] = [];
-          groups[dateStr].push({ ...order, dailyNo: groups[dateStr].length + 1 });
-        });
-
-        for (const date in groups) groups[date].reverse(); 
-
-        setGroupedOrders(groups);
-        const availableDates = Object.keys(groups).reverse();
-        if (availableDates.length > 0) setSelectedDate(availableDates[0]);
-      } catch (error) {
-        console.error("Gagal mengambil history", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchHistory();
-  }, []);
+  }, [fetchHistory]);
 
   const toggleTheme = () => {
     const isDark = !isDarkMode;
     setIsDarkMode(isDark);
     document.documentElement.classList.toggle("dark", isDark);
     localStorage.setItem("kanovi_theme", isDark ? "dark" : "light");
+  };
+
+  // --- 2. FUNGSI HANDLE VOID ORDER ---
+  const handleVoidOrder = async (orderId: number) => {
+    const pin = prompt("🔒 Otorisasi Manager\nMasukkan 6 Digit PIN untuk membatalkan transaksi ini:");
+    
+    if (!pin) return; // Batal jika input kosong atau di-cancel
+
+    try {
+      await api.voidOrder(orderId, pin);
+      alert("✅ Transaksi berhasil di-VOID. Stok bahan baku telah dikembalikan.");
+      fetchHistory(); // Panggil ulang data agar UI otomatis ter-update!
+    } catch (err: any) {
+      alert("❌ Gagal VOID: " + err.message);
+    }
   };
 
   const dateList = Object.keys(groupedOrders).reverse();
@@ -112,14 +133,18 @@ export default function HistoryPage() {
             {!selectedDate ? ( <div className="h-full flex items-center justify-center text-gray-500">Pilih tanggal untuk melihat riwayat.</div> ) : (
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 auto-rows-max">
                 
-                {/* 1 BARIS SAKTI PEMANGGILAN KOMPONEN */}
+                {/* 3. MENGIRIM PROP onVoid KE DALAM KARTU */}
                 {groupedOrders[selectedDate]?.map((order) => (
-                  <HistoryCard key={order.id} order={order} />
+                  <HistoryCard 
+                    key={order.id} 
+                    order={order} 
+                    onVoid={handleVoidOrder} // 
+                  />
                 ))}
-
               </div>
             )}
           </div>
+
         </div>
       </div>
     </div>
