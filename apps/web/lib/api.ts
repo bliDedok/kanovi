@@ -82,11 +82,17 @@ export const api = {
       body: JSON.stringify({ qtyChange, reason }),
     }),
 
-  createOrder: (data: { origin: string; customerName?: string; items: any[] }) =>
-    fetchApi("/api/orders", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
+createOrder: (data: { 
+  origin: string; 
+  customerName?: string; 
+  branch: string;    
+  sessionId: number; 
+  items: any[] 
+}) =>
+  fetchApi("/api/orders", {
+    method: "POST",
+    body: JSON.stringify(data),
+  }),
 
   checkOrderStock: (orderId: number) =>
     fetchApi(`/api/orders/${orderId}/stock-check`),
@@ -103,4 +109,37 @@ export const api = {
       method: "POST",
       body: JSON.stringify(paymentData),
     }),
+
+  getActiveSession: (branch: string) => 
+    fetchApi(`/api/finance/sessions/active?branch=${branch}`),
+
+  openSession: (data: { branch: string; openedBy: string; initialCash: number }) =>
+    fetchApi("/api/finance/sessions/open", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  closeSession: (data: { sessionId: number; closedBy: string; actualCash: number; note?: string }) =>
+    fetchApi("/api/finance/sessions/close", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  createExpense: (data: { sessionId: number; amount: number; description: string; recordedBy: string }) =>
+    fetchApi("/api/finance/expenses", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  getProfile: () => 
+    fetchApi("/api/auth/profile"),
+
+  getFinanceReport: () => 
+    fetchApi("/api/finance/report"),
+
+  updateSession: (id: number, data: any) =>
+  fetchApi(`/api/finance/sessions/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  }),
 };
