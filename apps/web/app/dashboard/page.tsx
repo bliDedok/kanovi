@@ -18,6 +18,14 @@ export default function DashboardPage() {
           <p className="text-sm md:text-base text-kanovi-coffee/70 dark:text-kanovi-cream/60">Tambah, edit, dan hapus daftar kopi beserta harganya.</p>
         </Link>
 
+          <Link href="/dashboard/recipe" className="group bg-kanovi-paper dark:bg-kanovi-darker p-5 md:p-6 rounded-2xl shadow-sm border border-kanovi-cream/50 dark:border-white/5 hover:border-kanovi-wood dark:hover:border-kanovi-wood hover:shadow-md transition-all cursor-pointer">
+          <div className="bg-kanovi-cream/50 dark:bg-kanovi-wood/20 w-12 h-12 md:w-14 md:h-14 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            <span className="text-2xl md:text-3xl">📖</span>
+          </div>
+          <h2 className="text-xl md:text-2xl font-bold text-kanovi-coffee dark:text-kanovi-bone mb-2 group-hover:text-kanovi-wood transition-colors">Kelola Recipe</h2>
+          <p className="text-sm md:text-base text-kanovi-coffee/70 dark:text-kanovi-cream/60">Atur komposisi bahan tiap menu dan perbarui resep.</p>
+        </Link>
+
         <Link href="/dashboard/category" className="group bg-kanovi-paper dark:bg-kanovi-darker p-5 md:p-6 rounded-2xl shadow-sm border border-kanovi-cream/50 dark:border-white/5 hover:border-kanovi-wood dark:hover:border-kanovi-wood hover:shadow-md transition-all cursor-pointer">
           <div className="bg-kanovi-cream/50 dark:bg-kanovi-wood/20 w-12 h-12 md:w-14 md:h-14 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
             <span className="text-2xl md:text-3xl">📊</span>
@@ -26,20 +34,20 @@ export default function DashboardPage() {
           <p className="text-sm md:text-base text-kanovi-coffee/70 dark:text-kanovi-cream/60">Tambah, edit, dan hapus kategori menu.</p>
         </Link>
 
-          <Link href="/dashboard/inventory" className="group bg-kanovi-paper dark:bg-kanovi-darker p-5 md:p-6 rounded-2xl shadow-sm border border-kanovi-cream/50 dark:border-white/5 hover:border-kanovi-wood dark:hover:border-kanovi-wood hover:shadow-md transition-all cursor-pointer">
-          <div className="bg-kanovi-cream/50 dark:bg-kanovi-wood/20 w-12 h-12 md:w-14 md:h-14 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-            <span className="text-2xl md:text-3xl">📖</span>
-          </div>
-          <h2 className="text-xl md:text-2xl font-bold text-kanovi-coffee dark:text-kanovi-bone mb-2 group-hover:text-kanovi-wood transition-colors">Kelola Recipe</h2>
-          <p className="text-sm md:text-base text-kanovi-coffee/70 dark:text-kanovi-cream/60">Atur komposisi bahan tiap menu dan perbarui resep.</p>
-        </Link>
-
         <Link href="/dashboard/inventory" className="group bg-kanovi-paper dark:bg-kanovi-darker p-5 md:p-6 rounded-2xl shadow-sm border border-kanovi-cream/50 dark:border-white/5 hover:border-kanovi-wood dark:hover:border-kanovi-wood hover:shadow-md transition-all cursor-pointer">
           <div className="bg-kanovi-cream/50 dark:bg-kanovi-wood/20 w-12 h-12 md:w-14 md:h-14 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
             <span className="text-2xl md:text-3xl">📦</span>
           </div>
           <h2 className="text-xl md:text-2xl font-bold text-kanovi-coffee dark:text-kanovi-bone mb-2 group-hover:text-kanovi-wood transition-colors">Kelola Stock</h2>
           <p className="text-sm md:text-base text-kanovi-coffee/70 dark:text-kanovi-cream/60">Atur stok bahan baku dan monitor level minimum.</p>
+        </Link>
+
+          <Link href="/dashboard/finance" className="group bg-kanovi-paper dark:bg-kanovi-darker p-5 md:p-6 rounded-2xl shadow-sm border border-kanovi-cream/50 dark:border-white/5 hover:border-kanovi-wood dark:hover:border-kanovi-wood hover:shadow-md transition-all cursor-pointer">
+          <div className="bg-kanovi-cream/50 dark:bg-kanovi-wood/20 w-12 h-12 md:w-14 md:h-14 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            <span className="text-2xl md:text-3xl">📈</span>
+          </div>
+          <h2 className="text-xl md:text-2xl font-bold text-kanovi-coffee dark:text-kanovi-bone mb-2 group-hover:text-kanovi-wood transition-colors">Kelola Keuangan</h2>
+          <p className="text-sm md:text-base text-kanovi-coffee/70 dark:text-kanovi-cream/60">Laporan Keuangan Kanovi</p>
         </Link>
 
       </div>

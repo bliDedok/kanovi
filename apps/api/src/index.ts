@@ -9,6 +9,7 @@ import ingredientRoutes from "./routes/ingredientRoutes";
 import categoryRoutes from "./routes/categoryRoutes";
 import orderRoutes from "./routes/orderRoutes";
 import queueRoutes from "./routes/queueRoutes";
+import financeRoutes from "./routes/financeRoutes";
 
 const port = Number(process.env.PORT ?? 3001);
 const app = Fastify({ logger: true });
@@ -32,6 +33,7 @@ app.register(ingredientRoutes, { prefix: "/api/ingredients" });
 app.register(categoryRoutes, { prefix: "/categories" }); 
 app.register(orderRoutes, { prefix: "/api/orders" });
 app.register(queueRoutes, { prefix: "/api" }); 
+app.register(financeRoutes, { prefix: "/api/finance" });
 
 // --- SEEDING DATABASE UNTUK DEV ---
 app.post("/dev/seed", async (_req, reply) => {

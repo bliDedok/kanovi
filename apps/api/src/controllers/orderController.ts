@@ -12,6 +12,9 @@ const orderCreateSchema = z.object({
   origin: z.enum(["COUNTER", "KITCHEN", "BAR"]),
   customerName: z.string().trim().min(1).optional(),
   items: z.array(orderItemSchema).min(1),
+  // --- TAMBAHAN SURGICAL: Agar Zod mengizinkan data ini masuk ---
+  branch: z.enum(["PUSAT", "RESTART"]).optional(),
+  sessionId: z.number().int().positive().optional(),
 });
 
 const paySchema = z.object({
@@ -20,7 +23,7 @@ const paySchema = z.object({
   overrideNote: z.string().trim().optional(),
 });
 
-// ====== 2. HELPER FUNGSI STOK ======
+// ====== 2. HELPER FUNGSI STOK (TIDAK DISENTUH) ======
 type StockRequirement = {
   ingredientId: number;
   ingredientName: string;
@@ -120,7 +123,8 @@ export const createOrder = async (req: FastifyRequest, reply: FastifyReply) => {
     return reply.code(401).send({ error: "Unauthorized: User ID tidak ditemukan dalam token." });
   }
 
-  const { origin, customerName, items } = parsed.data;
+  // --- TAMBAHAN SURGICAL: Ambil data branch & sessionId dari body ---
+  const { origin, customerName, items, branch, sessionId } = parsed.data;
 
   const menus = await prisma.menu.findMany({
     where: { id: { in: items.map((i) => i.menuId) } },
@@ -159,6 +163,9 @@ export const createOrder = async (req: FastifyRequest, reply: FastifyReply) => {
       origin,
       customerName,
       totalPrice,
+      // --- TAMBAHAN SURGICAL: Simpan data ke kolom DB ---
+      branch: branch || "PUSAT",
+      sessionId: sessionId || null,
       paymentStatus: "UNPAID",
       details: {
         create: details,
@@ -169,6 +176,8 @@ export const createOrder = async (req: FastifyRequest, reply: FastifyReply) => {
 
   return reply.send(order);
 };
+
+// --- FUNGSI checkOrderStock & payOrder (TIDAK DISENTUH SAMA SEKALI) ---
 
 export const checkOrderStock = async (req: FastifyRequest, reply: FastifyReply) => {
   const id = Number((req.params as any).id);
