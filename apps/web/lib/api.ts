@@ -142,4 +142,10 @@ createOrder: (data: {
     method: "PATCH",
     body: JSON.stringify(data),
   }),
+
+  voidOrder: (orderId: number, pin: string) =>
+    fetchApi(`/api/orders/${orderId}/void`, {
+      method: "POST",
+      body: JSON.stringify({ pin }),
+    }),
 };
