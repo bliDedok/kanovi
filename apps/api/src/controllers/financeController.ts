@@ -103,53 +103,80 @@ export const financeController = {
 
   // 6. LAPORAN OWNER
 getFinanceReport: async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-      const sessions = await prisma.cashSession.findMany({
-        include: { 
-          orders: { 
-            where: { paymentStatus: "PAID" },
-            orderBy: { orderedAt: "desc" }
-          }, 
-          expenses: {
-            orderBy: { createdAt: "desc" }
-          } 
-        },
-        orderBy: { openedAt: "desc" },
-      });
-
-      const report = sessions.map(s => {
-        const totalSales = s.orders.reduce((sum, o) => sum + o.totalPrice, 0);
-        const cashSales = s.orders.filter(o => o.paymentMethod === "CASH").reduce((sum, o) => sum + o.totalPrice, 0);
-        const qrisSales = s.orders.filter(o => o.paymentMethod === "QRIS").reduce((sum, o) => sum + o.totalPrice, 0);
-        
-        let shareKampus = s.branch === "RESTART" ? Math.round(totalSales * 0.25) : 0;
-        let shareKanovi = totalSales - shareKampus;
-
-        return {
-          id: s.id,
-          branch: s.branch,
-          openedAt: s.openedAt,
-          closedAt: s.closedAt,
-          totalSales,
-          cashSales,
-          qrisSales,
-          initialCash: s.initialCash,
-          actualCash: s.actualCash,
-          shareKampus,
-          shareKanovi,
-          expenses: s.expenses.reduce((sum, e) => sum + e.amount, 0),
-          difference: s.difference || 0,
-          note: s.note,
-          status: s.status,
-          // --- LOGIC BARU: Kirim list mentah untuk history ---
-          orders: s.orders, 
-          expenses_list: s.expenses 
-        };
-      });
-
-      return reply.send(report);
-    } catch (error: any) {
-      return reply.status(500).send({ error: error.message });
+  try {
+    const { from, to } = request.query as { from?: string; to?: string };
+    
+    // Logic Filter Tanggal
+    const dateFilter: any = {};
+    if (from || to) {
+      dateFilter.openedAt = {};
+      if (from) dateFilter.openedAt.gte = new Date(from);
+      if (to) {
+        const endOfDay = new Date(to);
+        endOfDay.setHours(23, 59, 59, 999);
+        dateFilter.openedAt.lte = endOfDay;
+      }
     }
+
+    const sessions = await prisma.cashSession.findMany({
+      where: dateFilter,
+      orderBy: { openedAt: "desc" },
+      include: {
+        orders: {
+          where: { paymentStatus: "PAID" },
+          include: { details: { include: { menu: true } } }
+        },
+        expenses: true,
+      },
+    });
+
+    // --- LOGIC ANALITIK PRODUK TERLARIS (Top 5) ---
+    const productStats = new Map<string, { name: string, qty: number, revenue: number }>();
+    
+    const reports = sessions.map((s) => {
+      const totalSales = s.orders.reduce((sum, o) => sum + o.totalPrice, 0);
+      const totalExpenses = s.expenses.reduce((sum, e) => sum + e.amount, 0);
+      
+      // Hitung per produk untuk analitik
+      s.orders.forEach(order => {
+        order.details.forEach(detail => {
+          const existing = productStats.get(String(detail.menuId)) || { name: detail.menu.name, qty: 0, revenue: 0 };
+          productStats.set(String(detail.menuId), {
+            name: detail.menu.name,
+            qty: existing.qty + detail.qty,
+            revenue: existing.revenue + (detail.price * detail.qty)
+          });
+        });
+      });
+
+      const shareKampus = s.branch === "RESTART" ? totalSales * 0.25 : 0;
+      const shareKanovi = totalSales - shareKampus;
+
+      return {
+        id: s.id,
+        branch: s.branch,
+        openedAt: s.openedAt,
+        closedAt: s.closedAt,
+        status: s.status,
+        initialCash: s.initialCash,
+        actualCash: s.actualCash,
+        totalSales,
+        expenses: totalExpenses,
+        difference: (s.actualCash || 0) - (s.initialCash + totalSales - totalExpenses),
+        shareKampus,
+        shareKanovi,
+        orders: s.orders,
+        expenses_list: s.expenses
+      };
+    });
+
+    const topProducts = Array.from(productStats.values())
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 5);
+
+    return reply.send({ reports, topProducts });
+  } catch (error: any) {
+    return reply.status(500).send({ error: error.message });
   }
+}
 };

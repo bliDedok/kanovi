@@ -134,8 +134,8 @@ createOrder: (data: {
   getProfile: () => 
     fetchApi("/api/auth/profile"),
 
-  getFinanceReport: () => 
-    fetchApi("/api/finance/report"),
+getFinanceReport: (from?: string, to?: string) => 
+  fetchApi(`/api/finance/report?from=${from || ''}&to=${to || ''}`),
 
   updateSession: (id: number, data: any) =>
   fetchApi(`/api/finance/sessions/${id}`, {
