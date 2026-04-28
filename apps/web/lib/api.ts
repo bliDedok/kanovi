@@ -9,6 +9,21 @@ export const getToken = (): string | undefined => {
     ?.split("=")[1];
 };
 
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  payload: any;
+
+  constructor(status: number, payload: any, fallbackMessage = "Terjadi kesalahan pada server") {
+    super(payload?.message || payload?.error || fallbackMessage);
+
+    this.name = "ApiError";
+    this.status = status;
+    this.code = payload?.error;
+    this.payload = payload;
+  }
+}
+
 // Custom Fetcher yang otomatis memasukkan token
 export const fetchApi = async (endpoint: string, options: RequestInit = {}) => {
   const token = getToken();
