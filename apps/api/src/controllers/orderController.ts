@@ -133,8 +133,10 @@ export const createOrder = async (req: FastifyRequest, reply: FastifyReply) => {
     where: { id: { in: items.map((i) => i.menuId) } },
     select: {
       id: true,
+      name: true,
       price: true,
       prepStation: true,
+      isAvailable: true,
     },
   });
 
@@ -142,6 +144,19 @@ export const createOrder = async (req: FastifyRequest, reply: FastifyReply) => {
 
   if (menus.length !== new Set(items.map((i) => i.menuId)).size) {
     return reply.code(400).send({ error: "Ada menu yang tidak ditemukan." });
+  }
+
+  const unavailableMenus = menus.filter((menu) => !menu.isAvailable);
+
+  if (unavailableMenus.length > 0) {
+    return reply.code(409).send({
+      error: "MENU_NOT_AVAILABLE",
+      message: "Ada menu yang sedang tidak tersedia.",
+      menus: unavailableMenus.map((menu) => ({
+        id: menu.id,
+        name: menu.name,
+      })),
+    });
   }
 
   const details = items.map((i) => {
@@ -220,10 +235,22 @@ export const payOrder = async (req: FastifyRequest, reply: FastifyReply) => {
       `SELECT id FROM "Order" WHERE id = ${id} FOR UPDATE`
     );
 
-    const lockedOrder = await tx.order.findUnique({
-      where: { id },
-      include: { details: true },
-    });
+  const lockedOrder = await tx.order.findUnique({
+    where: { id },
+    include: {
+      details: {
+        include: {
+          menu: {
+            select: {
+              id: true,
+              name: true,
+              isAvailable: true,
+            },
+          },
+        },
+      },
+    },
+  });
 
     if (!lockedOrder) {
       return { kind: "NOT_FOUND" as const };
@@ -239,6 +266,20 @@ export const payOrder = async (req: FastifyRequest, reply: FastifyReply) => {
     if (lockedOrder.paymentStatus === "VOID") {
       return { kind: "VOID" as const };
     }
+
+    const unavailableMenus = lockedOrder.details
+  .map((detail) => detail.menu)
+  .filter((menu) => !menu.isAvailable);
+
+  if (unavailableMenus.length > 0) {
+    return {
+      kind: "MENU_NOT_AVAILABLE" as const,
+      menus: unavailableMenus.map((menu) => ({
+        id: menu.id,
+        name: menu.name,
+      })),
+    };
+  }
 
     const menuIds = [...new Set(lockedOrder.details.map((d) => d.menuId))];
 
@@ -321,6 +362,14 @@ export const payOrder = async (req: FastifyRequest, reply: FastifyReply) => {
   if (txResult.kind === "VOID") {
     return reply.code(409).send({ error: "Order already VOID" });
   }
+
+  if (txResult.kind === "MENU_NOT_AVAILABLE") {
+  return reply.code(409).send({
+    error: "MENU_NOT_AVAILABLE",
+    message: "Ada menu yang sedang tidak tersedia.",
+    menus: txResult.menus,
+  });
+}
 
   if (txResult.kind === "SHORTAGE") {
     return reply.code(409).send({
