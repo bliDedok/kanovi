@@ -105,7 +105,8 @@ model Menu {
   name        String      // Nama makanan/minuman
   price       Int         // Harga jual
   categoryId  Int?        // ID kategori (bisa kosong)
-  prepStation PrepStation @default(KITCHEN) // Dibuat di Bar atau Kitchen?
+  prepStation PrepStation @default(KITCHEN) 
+  isAvailable Boolean  @default(true)
 
   category    Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   recipes     Recipe[]      // Relasi: Resep bahan baku yang dibutuhkan
@@ -113,6 +114,7 @@ model Menu {
 
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+  @@index([isAvailable])
 }
 
 model Ingredient {

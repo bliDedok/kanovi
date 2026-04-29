@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { ShoppingCart, Trash2, Menu as MenuIcon, X, MonitorPlay, History, LogOut, Receipt, Calculator, BookmarkPlus, Library } from "lucide-react";
 import { PaymentMethod, Menu, CartItem, ShortageItem } from "../../types";
 import { api } from "../../lib/api";
-// IMPORT HoldBillModal yang baru kita buat
 import { ClearCartModal, CashModal, QrisModal, ShortageModal, SuccessModal, HoldBillModal } from "../components/PosModals";
 import OpeningSessionModal from "../components/OpeningSessionModal";
 import { ExpenseModal, ClosingModal } from "../components/FinanceModals";
@@ -93,15 +92,49 @@ export default function POSPage() {
   };
 
   const addToCart = (menu: Menu) => {
+    if (!menu.isAvailable) {
+      alert(`${menu.name} sedang tidak tersedia.`);
+      return;
+    }
+
     setCart((prev) => {
       const exists = prev.find((i) => i.id === menu.id);
-      if (exists) return prev.map((i) => i.id === menu.id ? { ...i, qty: i.qty + 1 } : i);
+
+      if (exists) {
+        return prev.map((i) =>
+          i.id === menu.id ? { ...i, qty: i.qty + 1 } : i
+        );
+      }
+
       return [...prev, { ...menu, qty: 1 }];
     });
   };
 
+  const getUnavailableCartItems = () => {
+  const latestMenuMap = new Map(menus.map((menu) => [menu.id, menu]));
+
+    return cart.filter((cartItem) => {
+      const latestMenu = latestMenuMap.get(cartItem.id);
+
+      return latestMenu?.isAvailable === false;
+    });
+  };
+
   const updateQty = (id: number, delta: number) => {
-    setCart((prev) => prev.map((i) => i.id === id ? { ...i, qty: i.qty + delta } : i).filter((i) => i.qty > 0));
+    if (delta > 0) {
+      const latestMenu = menus.find((menu) => menu.id === id);
+
+      if (latestMenu?.isAvailable === false) {
+        alert(`${latestMenu.name} sedang tidak tersedia.`);
+        return;
+      }
+    }
+
+    setCart((prev) =>
+      prev
+        .map((i) => (i.id === id ? { ...i, qty: i.qty + delta } : i))
+        .filter((i) => i.qty > 0)
+    );
   };
 
   // --- LOGIC HOLD BILL ---
@@ -133,7 +166,19 @@ export default function POSPage() {
     if (cart.length === 0 || isSubmitting) return;
     if (override && !overrideReason.trim()) return alert("Alasan override wajib diisi!");
 
-    setIsSubmitting(true);
+    const unavailableCartItems = getUnavailableCartItems();
+
+    if (unavailableCartItems.length > 0) {
+      alert(
+        `Ada menu yang sudah tidak tersedia: ${unavailableCartItems
+          .map((item) => item.name)
+          .join(", ")}. Hapus menu tersebut dari keranjang sebelum melanjutkan pembayaran.`
+      );
+      return;
+    }
+
+  setIsSubmitting(true);
+
     try {
       let orderId: number;
       if (pendingOrderId !== null) { orderId = pendingOrderId; } 
@@ -163,8 +208,37 @@ export default function POSPage() {
       setCart([]); setCustomerName(""); setCashReceived(""); setOverrideReason(""); 
       setIsCashModalOpen(false); setIsQrisModalOpen(false); setIsShortageModalOpen(false);
       setPendingOrderId(null); setShowSuccessModal(true);
-    } catch (error: any) { alert(error.message); } finally { setIsSubmitting(false); }
-  };
+      } catch (error: any) {
+        const payload = error?.payload;
+        const code = error?.code || payload?.error;
+
+        if (code === "MENU_NOT_AVAILABLE") {
+          const menuNames = Array.isArray(payload?.menus)
+            ? payload.menus
+                .map((menu: { name?: string }) => menu.name)
+                .filter(Boolean)
+                .join(", ")
+            : "";
+
+          alert(
+            menuNames
+              ? `Menu sedang tidak tersedia: ${menuNames}. Hapus menu tersebut dari keranjang sebelum melanjutkan pembayaran.`
+              : "Ada menu yang sedang tidak tersedia. Hapus menu tersebut dari keranjang sebelum melanjutkan pembayaran."
+          );
+
+          setPendingOrderId(null);
+          setIsCashModalOpen(false);
+          setIsQrisModalOpen(false);
+          setIsShortageModalOpen(false);
+
+          return;
+        }
+
+        alert(error?.message || "Gagal memproses pembayaran.");
+      } finally {
+        setIsSubmitting(false);
+      }  
+};
 
   const totalTagihan = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
   const filteredMenus = menus.filter((menu) => menu.name.toLowerCase().includes(searchQuery.toLowerCase()) && (selectedCategory === "ALL" || String(menu.category?.id ?? "") === selectedCategory));
@@ -221,9 +295,19 @@ export default function POSPage() {
         <main className="flex-1 overflow-y-auto p-3 md:p-4 lg:p-6">
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-3 sm:gap-4">
             {filteredMenus.map((menu) => (
-              <button key={menu.id} onClick={() => addToCart(menu)} className="w-full max-w-32 aspect-square mx-auto bg-kanovi-dark text-white dark:bg-[#EADBC8] dark:text-kanovi-coffee rounded-xl p-3 flex flex-col justify-between items-start text-left shadow-sm active:scale-95 transition-all border border-black/5 dark:border-white/5">
+              <button key={menu.id} type="button" onClick={() => addToCart(menu)} disabled={!menu.isAvailable} title={menu.isAvailable? `Tambah ${menu.name}`: `${menu.name} sedang tidak tersedia`} className={`w-full max-w-32 aspect-square mx-auto rounded-xl p-3 flex flex-col justify-between items-start text-left shadow-sm transition-all border border-black/5 dark:border-white/5 ${ menu.isAvailable? "bg-kanovi-dark text-white dark:bg-[#EADBC8] dark:text-kanovi-coffee active:scale-95 hover:shadow-md" : "bg-kanovi-dark/50 text-white/70 dark:bg-[#EADBC8]/50 dark:text-kanovi-coffee/60 opacity-60 cursor-not-allowed grayscale"}`}>                
                 <span className="font-bold text-xs leading-tight line-clamp-3">{menu.name}</span>
-                <span className="font-medium text-[11px] opacity-90">Rp {menu.price.toLocaleString("id-ID")}</span>
+                    <div className="flex flex-col gap-1">
+                      <span className="font-medium text-[11px] opacity-90">
+                        Rp {menu.price.toLocaleString("id-ID")}
+                      </span>
+
+                      {!menu.isAvailable && (
+                        <span className="inline-flex w-fit rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700 dark:bg-red-500/20 dark:text-red-300">
+                          Tidak Tersedia
+                      </span>
+                    )}
+                  </div>
               </button>
             ))}
           </div>
@@ -269,19 +353,50 @@ export default function POSPage() {
             <div className="flex-1 flex flex-col items-center justify-center opacity-30 text-kanovi-coffee dark:text-white gap-4"><ShoppingCart className="w-16 h-16" /><p className="text-sm font-medium">Belum ada pesanan</p></div>
           ) : (
             <div className="flex flex-col gap-1 w-full mt-2">
-              {cart.map((item) => (
-                <div key={item.id} className="flex flex-col py-3 border-b border-kanovi-cream/30 dark:border-white/5 last:border-0">
-                  <h4 className="font-semibold text-kanovi-coffee dark:text-white text-xs md:text-sm leading-tight mb-1.5">{item.name}</h4>
-                  <div className="flex justify-between items-center">
-                    <div className="text-kanovi-wood dark:text-kanovi-cream/70 text-xs md:text-sm font-medium">Rp {(item.price * item.qty).toLocaleString("id-ID")}</div>
-                    <div className="flex items-center gap-1 md:gap-2 bg-kanovi-bone dark:bg-kanovi-dark rounded-full p-1 border border-kanovi-cream/50 dark:border-white/5">
-                      <button onClick={() => updateQty(item.id, -1)} className="w-6 h-6 md:w-7 md:h-7 rounded-full bg-kanovi-paper dark:bg-kanovi-darker flex items-center justify-center text-kanovi-coffee dark:text-kanovi-cream hover:bg-kanovi-wood transition-colors shadow-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3 md:w-3.5 md:h-3.5"><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>
-                      <span className="font-bold text-xs md:text-sm w-4 md:w-5 text-center text-kanovi-coffee dark:text-white">{item.qty}</span>
-                      <button onClick={() => updateQty(item.id, 1)} className="w-6 h-6 md:w-7 md:h-7 rounded-full bg-kanovi-paper dark:bg-kanovi-darker flex items-center justify-center text-kanovi-coffee dark:text-kanovi-cream hover:bg-kanovi-wood transition-colors shadow-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3 md:w-3.5 md:h-3.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>
+              {cart.map((item) => {
+                const latestMenu = menus.find((menu) => menu.id === item.id);
+                const isUnavailable = latestMenu?.isAvailable === false;
+
+                return (
+                  <div key={item.id} className="flex flex-col py-3 border-b border-kanovi-cream/30 dark:border-white/5 last:border-0">
+                    <div className="flex items-start justify-between gap-2 mb-1.5">
+                      <h4 className="font-semibold text-kanovi-coffee dark:text-white text-xs md:text-sm leading-tight">{item.name}
+                      </h4>
+
+                      {isUnavailable && (
+                        <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-bold text-red-700 dark:bg-red-500/20 dark:text-red-300">
+                          Tidak Tersedia
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <div className="text-kanovi-wood dark:text-kanovi-cream/70 text-xs md:text-sm font-medium">
+                        Rp {(item.price * item.qty).toLocaleString("id-ID")}
+                      </div>
+
+                      <div className="flex items-center gap-1 md:gap-2 bg-kanovi-bone dark:bg-kanovi-dark rounded-full p-1 border border-kanovi-cream/50 dark:border-white/5">
+                        <button type="button" onClick={() => updateQty(item.id, -1)} className="w-6 h-6 md:w-7 md:h-7 rounded-full bg-kanovi-paper dark:bg-kanovi-darker flex items-center justify-center text-kanovi-coffee dark:text-kanovi-cream hover:bg-kanovi-wood transition-colors shadow-sm">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3 md:w-3.5 md:h-3.5">
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                          </svg>
+                        </button>
+
+                        <span className="font-bold text-xs md:text-sm w-4 md:w-5 text-center text-kanovi-coffee dark:text-white">
+                          {item.qty}
+                        </span>
+
+                        <button type="button" onClick={() => updateQty(item.id, 1)} disabled={isUnavailable} className="w-6 h-6 md:w-7 md:h-7 rounded-full bg-kanovi-paper dark:bg-kanovi-darker flex items-center justify-center text-kanovi-coffee dark:text-kanovi-cream hover:bg-kanovi-wood transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3 md:w-3.5 md:h-3.5">
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

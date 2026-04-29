@@ -19,9 +19,13 @@ export type Menu = {
   id: number;
   name: string;
   price: number;
+  isAvailable: boolean;
   categoryId?: number | null;
-  category?: Category | null;
-  prepStation: PrepStation;
+  category?: {
+    id: number;
+    name: string;
+    slug: string;
+  } | null;
 };
 
 export type CartItem = Menu & {
