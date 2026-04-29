@@ -12,11 +12,12 @@ export const createMenu = async (req: FastifyRequest, reply: FastifyReply) => {
     return reply.code(403).send({ message: "Akses ditolak. Hanya Owner." });
   }
 
-  const { name, price, categoryId, prepStation } = req.body as {
+  const { name, price, categoryId, prepStation, isAvailable } = req.body as {
     name: string;
     price: number;
     categoryId?: number | null;
     prepStation?: "KITCHEN" | "BAR";
+    isAvailable?: boolean;
   };
 
   if (!name || price === undefined || price === null) {
@@ -44,6 +45,8 @@ export const createMenu = async (req: FastifyRequest, reply: FastifyReply) => {
         price: Number(price),
         categoryId: categoryId ?? null,
         prepStation: prepStation ?? "KITCHEN",
+        isAvailable: isAvailable ?? true,
+
       },
       include: {
         category: true,
@@ -107,11 +110,12 @@ export const updateMenu = async (req: FastifyRequest, reply: FastifyReply) => {
   }
 
   const { id } = req.params as { id: string };
-  const { name, price, categoryId, prepStation } = req.body as {
+  const { name, price, categoryId, prepStation, isAvailable } = req.body as {
     name?: string;
     price?: number;
     categoryId?: number | null;
     prepStation?: "KITCHEN" | "BAR";
+    isAvailable?: boolean;
   };
 
   if (categoryId !== undefined && categoryId !== null) {
@@ -126,6 +130,12 @@ export const updateMenu = async (req: FastifyRequest, reply: FastifyReply) => {
     }
   }
 
+    if (isAvailable !== undefined && typeof isAvailable !== "boolean") {
+    return reply.code(400).send({
+      message: "Status ketersediaan menu harus boolean.",
+    });
+  }
+
   try {
     const updatedMenu = await prisma.menu.update({
       where: { id: Number(id) },
@@ -134,6 +144,7 @@ export const updateMenu = async (req: FastifyRequest, reply: FastifyReply) => {
         ...(price !== undefined && { price: Number(price) }),
         ...(categoryId !== undefined && { categoryId }),
         ...(prepStation !== undefined && { prepStation }),
+        ...(isAvailable !== undefined && { isAvailable }),
       },
       include: {
         category: true,

@@ -46,3 +46,39 @@ app.post("/dev/seed", async (_req, reply) => {
 });
 
 app.listen({ port, host: "0.0.0.0" });
+
+async function validateMenusAvailable(items: Array<{ menuId: number; qty: number }>) {
+  const menuIds = [...new Set(items.map((item) => item.menuId))];
+
+  const menus = await prisma.menu.findMany({
+    where: { id: { in: menuIds } },
+    select: { id: true, name: true, isAvailable: true },
+  });
+
+  if (menus.length !== menuIds.length) {
+    return {
+      ok: false as const,
+      code: 400,
+      payload: {
+        error: "MENU_NOT_FOUND",
+        message: "Ada menu yang tidak ditemukan.",
+      },
+    };
+  }
+
+  const unavailableMenus = menus.filter((menu) => !menu.isAvailable);
+
+  if (unavailableMenus.length > 0) {
+    return {
+      ok: false as const,
+      code: 409,
+      payload: {
+        error: "MENU_NOT_AVAILABLE",
+        message: "Ada menu yang sedang tidak tersedia.",
+        menus: unavailableMenus,
+      },
+    };
+  }
+
+  return { ok: true as const };
+}

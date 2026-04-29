@@ -18,6 +18,7 @@ export default function CreateMenuPage() {
   const [categoryId, setCategoryId] = useState("");
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
+  const [isAvailable, setIsAvailable] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
@@ -97,6 +98,7 @@ export default function CreateMenuPage() {
           name: trimmedName,
           price: numericPrice,
           categoryId: categoryId ? Number(categoryId) : null,
+          isAvailable,
         }),
       });
 
@@ -179,6 +181,25 @@ export default function CreateMenuPage() {
               ))}
             </select>
           </div>
+
+          <div>
+            <label className="block text-sm font-semibold mb-2 text-kanovi-coffee dark:text-kanovi-bone">
+              Status Ketersediaan
+            </label>
+
+            <select
+              value={isAvailable ? "available" : "unavailable"}
+              onChange={(e) => setIsAvailable(e.target.value === "available")}
+              className="w-full px-4 py-3 bg-kanovi-paper dark:bg-black/20 border border-kanovi-cream dark:border-white/10 rounded-xl text-kanovi-coffee dark:text-kanovi-bone"
+            >
+              <option value="available">Tersedia</option>
+              <option value="unavailable">Tidak Tersedia</option>
+            </select>
+
+            <p className="mt-2 text-xs text-kanovi-coffee/60 dark:text-kanovi-cream/50">
+              Default menu baru adalah tersedia. Ubah ke tidak tersedia jika menu belum siap dijual.
+            </p>
+        </div>
 
           <button
             type="submit"
