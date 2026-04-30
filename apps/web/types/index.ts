@@ -122,3 +122,30 @@ export type MenuWithRecipeFlag = Menu & {
   hasRecipe?: boolean;
   recipeCount?: number;
 };
+
+export type ReceiptItem = {
+  menuId: number;
+  name: string;
+  qty: number;
+  price: number;
+  subtotal: number;
+};
+
+export type ReceiptData = {
+  orderId: number;
+  orderNumber: string;
+  queueNumber: string;
+  customerName?: string;
+  employeeName: string;
+  posName: string;
+  storeName: string;
+  storeAddress: string;
+  items: ReceiptItem[];
+  subtotal: number;
+  total: number;
+  paymentMethod: PaymentMethod;
+  paidAmount: number;
+  changeAmount: number;
+  paidAt: string;
+  note: string;
+};

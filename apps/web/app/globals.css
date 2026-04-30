@@ -17,3 +17,47 @@
 }
 
 @custom-variant dark (&:is(.dark *));
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .receipt-print-target,
+  .receipt-print-target * {
+    visibility: hidden;
+  }
+
+  .receipt-print-target[data-print-active="true"],
+  .receipt-print-target[data-print-active="true"] * {
+    visibility: visible;
+  }
+
+  .receipt-print-target[data-print-active="true"] {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 80mm;
+    min-height: auto;
+    padding: 0;
+    margin: 0;
+    background: white;
+    color: black;
+    transform: translateX(-50%);
+    box-shadow: none !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+
+  .receipt-paper {
+    box-shadow: none !important;
+  }
+
+  .kitchen-ticket {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+}
