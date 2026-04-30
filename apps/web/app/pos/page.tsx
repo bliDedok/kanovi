@@ -3,11 +3,13 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ShoppingCart, Trash2, Menu as MenuIcon, X, MonitorPlay, History, LogOut, Receipt, Calculator, BookmarkPlus, Library } from "lucide-react";
-import { PaymentMethod, Menu, CartItem, ShortageItem } from "../../types";
+import { PaymentMethod, Menu, CartItem, ShortageItem, ReceiptData } from "../../types";
 import { api } from "../../lib/api";
+import { buildReceiptData } from "../../lib/receipt";
 import { ClearCartModal, CashModal, QrisModal, ShortageModal, SuccessModal, HoldBillModal } from "../components/PosModals";
 import OpeningSessionModal from "../components/OpeningSessionModal";
 import { ExpenseModal, ClosingModal } from "../components/FinanceModals";
+import ReceiptModal from "../components/ReceiptModal";
 
 export default function POSPage() {
   const router = useRouter();
@@ -30,11 +32,11 @@ export default function POSPage() {
   const [isExpenseOpen, setIsExpenseOpen] = useState(false);
   const [isClosingOpen, setIsClosingOpen] = useState(false);
   
-  // --- STATE HOLD BILL BARU ---
   const [holdBills, setHoldBills] = useState<{id: number, customerName: string, cart: CartItem[]}[]>([]);
   const [isHoldModalOpen, setIsHoldModalOpen] = useState(false);
 
   const [finalChange, setFinalChange] = useState(0);
+  const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const [pendingPaymentMethod, setPendingPaymentMethod] = useState<PaymentMethod | null>(null);
   const [pendingOrderId, setPendingOrderId] = useState<number | null>(null);
   const [shortages, setShortages] = useState<ShortageItem[]>([]);
@@ -74,14 +76,12 @@ export default function POSPage() {
     const savedCart = localStorage.getItem("kanovi_cart");
     if (savedCart) { try { setCart(JSON.parse(savedCart)); } catch { localStorage.removeItem("kanovi_cart"); } }
 
-    // LOAD HOLD BILLS DARI MEMORI
     const savedHolds = localStorage.getItem("kanovi_hold_bills");
     if (savedHolds) { try { setHoldBills(JSON.parse(savedHolds)); } catch (e) {} }
   }, []);
 
   useEffect(() => { localStorage.setItem("kanovi_cart", JSON.stringify(cart)); }, [cart]);
   
-  // SIMPAN HOLD BILLS KE MEMORI TIAP ADA PERUBAHAN
   useEffect(() => { localStorage.setItem("kanovi_hold_bills", JSON.stringify(holdBills)); }, [holdBills]);
 
   const toggleTheme = () => {
@@ -137,7 +137,6 @@ export default function POSPage() {
     );
   };
 
-  // --- LOGIC HOLD BILL ---
   const saveToHold = () => {
     if (cart.length === 0) return;
     const newBill = { 
@@ -204,10 +203,25 @@ export default function POSPage() {
 
       const total = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
       const cashNumInput = parseInt(cashReceived.replace(/[^0-9]/g, "")) || 0;
-      setFinalChange(method === "CASH" ? Math.max(cashNumInput - total, 0) : 0);
+      const paidAmount = method === "CASH" ? cashNumInput : total;
+      const changeAmount = method === "CASH" ? Math.max(cashNumInput - total, 0) : 0;
+
+      const receiptData = buildReceiptData({
+        orderId,
+        customerName,
+        cart,
+        paymentMethod: method,
+        paidAmount,
+        changeAmount,
+        employeeName: activeSession?.openedBy || "Owner",
+        posName: "POS 1",
+      });
+
+      setReceipt(receiptData);
+      setFinalChange(changeAmount);
       setCart([]); setCustomerName(""); setCashReceived(""); setOverrideReason(""); 
       setIsCashModalOpen(false); setIsQrisModalOpen(false); setIsShortageModalOpen(false);
-      setPendingOrderId(null); setShowSuccessModal(true);
+      setPendingOrderId(null); setShowSuccessModal(false);
       } catch (error: any) {
         const payload = error?.payload;
         const code = error?.code || payload?.error;
@@ -325,7 +339,6 @@ export default function POSPage() {
             )}
           </div>
           
-          {/* TOMBOL HOLD BILL UI */}
           <div className="flex gap-2">
             <button 
               onClick={saveToHold} 
@@ -438,7 +451,6 @@ export default function POSPage() {
         </div>
       )}
 
-      {/* --- MODALS --- */}
       <ClearCartModal isOpen={isClearCartModalOpen} onClose={() => setIsClearCartModalOpen(false)} onConfirm={() => { setCart([]); setIsClearCartModalOpen(false); }} />
       <CashModal isOpen={isCashModalOpen} onClose={() => setIsCashModalOpen(false)} totalTagihan={totalTagihan} cashReceived={cashReceived} setCashReceived={setCashReceived} uniqueSuggestedAmounts={uniqueSuggestedAmounts} isEnough={cashNum >= totalTagihan} kembalian={cashNum - totalTagihan} cashNum={cashNum} isSubmitting={isSubmitting} onProcess={handleProcessPayment} />
       <QrisModal isOpen={isQrisModalOpen} onClose={() => setIsQrisModalOpen(false)} totalTagihan={totalTagihan} isSubmitting={isSubmitting} onProcess={handleProcessPayment} />
@@ -448,13 +460,22 @@ export default function POSPage() {
       <ExpenseModal isOpen={isExpenseOpen} onClose={() => setIsExpenseOpen(false)} sessionId={activeSession?.id} />
       <ClosingModal isOpen={isClosingOpen} onClose={() => setIsClosingOpen(false)} sessionId={activeSession?.id} onClosingSuccess={() => { setActiveSession(null); setIsClosingOpen(false); localStorage.removeItem("kanovi_branch"); document.cookie = "kanovi_token=; path=/; max-age=0;"; router.push("/login"); }} />
       
-      {/* RENDER MODAL HOLD BILL */}
       <HoldBillModal 
         isOpen={isHoldModalOpen} 
         onClose={() => setIsHoldModalOpen(false)} 
         holdBills={holdBills} 
         onLoadBill={loadFromHold} 
       />
+
+      {receipt && (
+        <ReceiptModal
+          receipt={receipt}
+          onClose={() => {
+            setReceipt(null);
+            setShowSuccessModal(false);
+          }}
+        />
+      )}
     </div>
   );
 }
