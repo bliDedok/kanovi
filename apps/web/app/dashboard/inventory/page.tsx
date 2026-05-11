@@ -1,8 +1,16 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { Search, Plus, Package, Edit3, Settings2 } from "lucide-react";
+import {
+  Search,
+  Plus,
+  Package,
+  Edit3,
+  Settings2,
+  History,
+} from "lucide-react";
 import { api } from "../../../lib/api";
 import { Ingredient, StockReason } from "../../../types";
 import {
@@ -54,6 +62,8 @@ const isLowStockOnly = (item: Ingredient) =>
   item.stock > 0 && item.stock <= item.minStock;
 
 export default function InventoryPage() {
+  const router = useRouter();
+
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
   const [loading, setLoading] = useState(false);
@@ -187,7 +197,6 @@ export default function InventoryPage() {
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Header Section */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-black text-kanovi-coffee dark:text-white flex items-center gap-3">
@@ -200,21 +209,31 @@ export default function InventoryPage() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            setEditing(null);
-            setForm(emptyForm);
-            setFormOpen(true);
-          }}
-          className="bg-kanovi-wood hover:opacity-90 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-all"
-        >
-          <Plus className="w-5 h-5" />
-          Tambah Bahan Baru
-        </button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            onClick={() => router.push("/dashboard/stock-movements")}
+            className="bg-kanovi-darker hover:bg-kanovi-coffee text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg transition-all"
+          >
+            <History className="w-5 h-5" />
+            Riwayat Stok
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setEditing(null);
+              setForm(emptyForm);
+              setFormOpen(true);
+            }}
+            className="bg-kanovi-wood hover:opacity-90 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg transition-all"
+          >
+            <Plus className="w-5 h-5" />
+            Tambah Bahan Baru
+          </button>
+        </div>
       </div>
 
-      {/* Stats Section */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           {
@@ -250,7 +269,6 @@ export default function InventoryPage() {
         ))}
       </div>
 
-      {/* Restock Card */}
       {stats.needsRestock > 0 && (
         <section className="mb-6 rounded-2xl border border-yellow-200 bg-yellow-50 p-4 shadow-sm dark:border-yellow-500/20 dark:bg-yellow-500/10">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -338,7 +356,6 @@ export default function InventoryPage() {
         </section>
       )}
 
-      {/* Search & Filter */}
       <div className="flex flex-col md:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
@@ -374,7 +391,6 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* Table Section */}
       <div className="bg-white dark:bg-kanovi-darker rounded-2xl border border-kanovi-cream/50 dark:border-white/5 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -485,7 +501,6 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* Render Modals */}
       <IngredientFormModal
         isOpen={formOpen}
         onClose={() => setFormOpen(false)}

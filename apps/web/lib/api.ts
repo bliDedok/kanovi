@@ -67,6 +67,22 @@ export const api = {
 
   getIngredients: () => fetchApi("/api/ingredients"),
 
+  getStockMovements: (params?: {
+  startDate?: string;
+  endDate?: string;
+  reason?: string;
+}) => {
+  const query = new URLSearchParams();
+
+  if (params?.startDate) query.set("startDate", params.startDate);
+  if (params?.endDate) query.set("endDate", params.endDate);
+  if (params?.reason) query.set("reason", params.reason);
+
+  const queryString = query.toString();
+
+  return fetchApi(`/api/stock-movements${queryString ? `?${queryString}` : ""}`);
+},
+
   getMenuRecipe: (menuId: number) =>
     fetchApi(`/api/menus/${menuId}/recipe`),
 

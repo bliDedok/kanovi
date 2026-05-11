@@ -75,7 +75,37 @@ export type JwtPayload = {
   exp?: number;
 };
 
-export type StockReason = "RESTOCK" | "ADJUSTMENT" | "SPOIL";
+export type StockReason = "SALE" | "SALE_OVERRIDE" | "RESTOCK" | "ADJUSTMENT" | "SPOIL";
+
+export type StockMovement = {
+  id: number;
+  ingredientId: number;
+  qtyChange: number;
+  reason: StockReason;
+  orderId?: number | null;
+  createdAt: string;
+  ingredient: Ingredient;
+  order?: {
+    id: number;
+    customerName: string | null;
+    totalPrice: number;
+    paymentMethod?: PaymentMethod | null;
+    paidAt?: string | null;
+    orderedAt: string;
+  } | null;
+};
+
+export type StockMovementSummary = {
+  stockIn: number;
+  stockOut: number;
+  totalMovements: number;
+};
+
+export type StockMovementResponse = {
+  ok: boolean;
+  data: StockMovement[];
+  summary: StockMovementSummary;
+};
 
 export type Ingredient = {
   id: number;
