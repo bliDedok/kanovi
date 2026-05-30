@@ -3,6 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Edit3,
+  Hash,
+  ListOrdered,
+  Plus,
+  Search,
+  Tag,
+  Trash2,
+  X,
+  XCircle,
+} from "lucide-react";
 
 type Category = {
   id: number;
@@ -113,83 +126,127 @@ export default function CategoryListPage() {
     category.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  return (
-    <div className="max-w-5xl mx-auto w-full relative">
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 md:mb-8 gap-4">
-        <div className="w-full lg:w-auto">
-          <h1 className="text-2xl md:text-3xl font-bold text-kanovi-coffee dark:text-kanovi-bone">
-            Daftar Kategori
-          </h1>
-          <p className="text-sm md:text-base text-kanovi-coffee/70 dark:text-kanovi-cream/70 mt-1">
-            Kelola kategori menu untuk makanan, minuman, dan lainnya.
-          </p>
-        </div>
+  const softButtonClass =
+    "rounded-2xl bg-[#edf2f4] px-4 py-3 text-sm font-black text-[#20272c] shadow-[7px_7px_16px_rgba(130,145,152,0.18),-7px_-7px_16px_rgba(255,255,255,0.9)] transition-all active:shadow-[inset_5px_5px_10px_rgba(130,145,152,0.22),inset_-5px_-5px_10px_rgba(255,255,255,0.9)] dark:bg-white/[0.07] dark:text-white dark:shadow-[7px_7px_16px_rgba(0,0,0,0.26),-4px_-4px_12px_rgba(255,255,255,0.03)] dark:active:shadow-[inset_5px_5px_10px_rgba(0,0,0,0.28),inset_-5px_-5px_10px_rgba(255,255,255,0.035)]";
 
-        <div className="flex flex-col sm:flex-row w-full lg:w-auto gap-3">
-          <div className="relative w-full sm:w-64">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-kanovi-wood dark:text-kanovi-cream/50">
-              🔍
-            </span>
-            <input
-              type="text"
-              placeholder="Cari kategori..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-kanovi-paper dark:bg-kanovi-darker border border-kanovi-cream dark:border-kanovi-darker/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-kanovi-wood text-kanovi-coffee dark:text-kanovi-bone placeholder-kanovi-coffee/40 dark:placeholder-kanovi-cream/30 transition-shadow text-sm"
-            />
+  return (
+    <div className="mx-auto w-full max-w-6xl animate-fade-in space-y-6">
+      <section className="rounded-[2.2rem] border border-white/70 bg-[#edf2f4] p-6 shadow-[18px_18px_42px_rgba(130,145,152,0.20),-14px_-14px_34px_rgba(255,255,255,0.92)] dark:border-white/10 dark:bg-white/[0.055] dark:shadow-[18px_18px_42px_rgba(0,0,0,0.32),-8px_-8px_24px_rgba(255,255,255,0.035)] md:p-8">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            
+
+            <h1 className="text-3xl font-black tracking-tight text-[#20272c] dark:text-[#f7efe7] md:text-4xl">
+              Daftar Kategori
+            </h1>
+
+            <p className="mt-3 max-w-2xl text-sm font-semibold leading-relaxed text-[#6f7a80] dark:text-white/55 md:text-base">
+              Kelola kategori menu untuk makanan, minuman, dan lainnya.
+            </p>
           </div>
 
-          <Link
-            href="/dashboard/category/create"
-            className="w-full sm:w-auto px-5 py-2.5 bg-kanovi-wood hover:bg-kanovi-coffee text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex justify-center items-center gap-2"
-          >
-            <span>+</span> Tambah Kategori
-          </Link>
-        </div>
-      </div>
+          <div className="grid w-full gap-3 sm:grid-cols-[1fr_auto] lg:w-auto">
+            <div className="relative min-w-0 sm:w-72">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8a969c] dark:text-white/40" />
 
-      <div className="bg-kanovi-paper dark:bg-kanovi-darker rounded-xl shadow-sm border border-kanovi-cream/50 dark:border-white/5 overflow-hidden">
-        <div className="overflow-x-auto w-full">
-          <table className="w-full text-left border-collapse min-w-[700px]">
+              <input
+                type="text"
+                placeholder="Cari kategori..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full rounded-2xl bg-[#edf2f4] py-3 pl-12 pr-4 text-sm font-bold text-[#20272c] shadow-[inset_6px_6px_12px_rgba(130,145,152,0.20),inset_-6px_-6px_12px_rgba(255,255,255,0.92)] outline-none placeholder:text-[#8a969c] dark:bg-white/[0.06] dark:text-white dark:shadow-[inset_6px_6px_12px_rgba(0,0,0,0.28),inset_-6px_-6px_12px_rgba(255,255,255,0.035)] dark:placeholder:text-white/35"
+              />
+            </div>
+
+            <Link
+              href="/dashboard/category/create"
+              className="flex items-center justify-center gap-2 rounded-2xl bg-[#edf2f4] px-5 py-3 text-sm font-black text-[#20272c] shadow-[8px_8px_18px_rgba(130,145,152,0.2),-8px_-8px_18px_rgba(255,255,255,0.95)] transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-[inset_5px_5px_10px_rgba(130,145,152,0.22),inset_-5px_-5px_10px_rgba(255,255,255,0.92)] dark:bg-white/[0.07] dark:text-white dark:shadow-[8px_8px_18px_rgba(0,0,0,0.28),-5px_-5px_14px_rgba(255,255,255,0.035)] dark:active:shadow-[inset_5px_5px_10px_rgba(0,0,0,0.28),inset_-5px_-5px_10px_rgba(255,255,255,0.035)]"
+            >
+              <Plus className="h-5 w-5" />
+              Tambah Kategori
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-3">
+      </section>
+
+      <section className="overflow-hidden rounded-[2.2rem] bg-[#edf2f4] p-3 shadow-[18px_18px_42px_rgba(130,145,152,0.20),-14px_-14px_34px_rgba(255,255,255,0.92)] dark:bg-white/[0.055] dark:shadow-[18px_18px_42px_rgba(0,0,0,0.32),-8px_-8px_24px_rgba(255,255,255,0.035)]">
+        <div className="overflow-x-auto rounded-[1.7rem] bg-[#edf2f4] shadow-[inset_7px_7px_14px_rgba(130,145,152,0.16),inset_-7px_-7px_14px_rgba(255,255,255,0.88)] dark:bg-white/[0.035] dark:shadow-[inset_7px_7px_14px_rgba(0,0,0,0.24),inset_-7px_-7px_14px_rgba(255,255,255,0.03)]">
+          <table className="w-full min-w-[760px] border-collapse text-left">
             <thead>
-              <tr className="bg-kanovi-cream dark:bg-[#32251E] border-b-2 border-kanovi-wood/30 dark:border-white/10 text-kanovi-coffee dark:text-kanovi-cream text-xs md:text-sm uppercase tracking-wider shadow-sm">
-                <th className="p-3 md:p-4 font-bold">ID</th>
-                <th className="p-3 md:p-4 font-bold">Nama Kategori</th>
-                <th className="p-3 md:p-4 font-bold">Slug</th>
-                <th className="p-3 md:p-4 font-bold">Status</th>
-                <th className="p-3 md:p-4 font-bold">Urutan</th>
-                <th className="p-3 md:p-4 font-bold text-center">Aksi</th>
+              <tr className="text-xs font-black uppercase tracking-[0.18em] text-[#7a858b] dark:text-white/40">
+                <th className="px-5 py-5">
+                  <span className="inline-flex items-center gap-2">
+                    <Hash className="h-4 w-4" />
+                    ID
+                  </span>
+                </th>
+                <th className="px-5 py-5">
+                  <span className="inline-flex items-center gap-2">
+                    <Tag className="h-4 w-4" />
+                    Nama
+                  </span>
+                </th>
+                <th className="px-5 py-5">Slug</th>
+                <th className="px-5 py-5">Status</th>
+                <th className="px-5 py-5">
+                  <span className="inline-flex items-center gap-2">
+                    <ListOrdered className="h-4 w-4" />
+                    Urutan
+                  </span>
+                </th>
+                <th className="px-5 py-5 text-center">Aksi</th>
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-kanovi-cream/40 dark:divide-white/5 text-sm md:text-base">
+            <tbody className="text-sm font-bold">
               {filteredCategories.map((category) => (
                 <tr
                   key={category.id}
-                  className="hover:bg-kanovi-cream/20 dark:hover:bg-white/5 transition-colors"
+                  className="border-t border-white/50 transition-colors hover:bg-white/30 dark:border-white/5 dark:hover:bg-white/[0.035]"
                 >
-                  <td className="p-3 md:p-4 text-kanovi-coffee/60 dark:text-kanovi-cream/50">
+                  <td className="px-5 py-4 text-[#8a969c] dark:text-white/40">
                     #{category.id}
                   </td>
-                  <td className="p-3 md:p-4 font-semibold text-kanovi-coffee dark:text-kanovi-bone">
+
+                  <td className="px-5 py-4 text-[#20272c] dark:text-[#f7efe7]">
                     {category.name}
                   </td>
-                  <td className="p-3 md:p-4 text-kanovi-wood dark:text-kanovi-cream">
+
+                  <td className="px-5 py-4 text-[#6f7a80] dark:text-white/50">
                     {category.slug}
                   </td>
-                  <td className="p-3 md:p-4 text-kanovi-coffee dark:text-kanovi-bone">
-                    {category.isActive ? "Aktif" : "Nonaktif"}
+
+                  <td className="px-5 py-4">
+                    <span
+                      className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-black ${
+                        category.isActive
+                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"
+                          : "bg-red-500/10 text-red-500 dark:text-red-300"
+                      }`}
+                    >
+                      {category.isActive ? (
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                      ) : (
+                        <XCircle className="h-3.5 w-3.5" />
+                      )}
+                      {category.isActive ? "Aktif" : "Nonaktif"}
+                    </span>
                   </td>
-                  <td className="p-3 md:p-4 text-kanovi-coffee dark:text-kanovi-bone">
+
+                  <td className="px-5 py-4 text-[#20272c] dark:text-[#f7efe7]">
                     {category.sortOrder ?? 0}
                   </td>
 
-                  <td className="p-3 md:p-4 text-center">
-                    <div className="flex justify-center items-center gap-2">
+                  <td className="px-5 py-4">
+                    <div className="flex items-center justify-center gap-2">
                       <Link
                         href={`/dashboard/category/${category.id}/edit`}
-                        className="px-3 py-1.5 bg-kanovi-cream/40 hover:bg-kanovi-cream/70 dark:bg-white/5 dark:hover:bg-white/10 text-kanovi-coffee dark:text-kanovi-cream text-xs md:text-sm font-medium rounded-md transition-colors"
+                        className="inline-flex items-center gap-2 rounded-xl bg-[#edf2f4] px-3 py-2 text-xs font-black text-[#20272c] shadow-[5px_5px_11px_rgba(130,145,152,0.18),-5px_-5px_11px_rgba(255,255,255,0.9)] transition-all active:shadow-[inset_4px_4px_8px_rgba(130,145,152,0.22),inset_-4px_-4px_8px_rgba(255,255,255,0.9)] dark:bg-white/[0.07] dark:text-white dark:shadow-[5px_5px_11px_rgba(0,0,0,0.24),-3px_-3px_9px_rgba(255,255,255,0.03)]"
                       >
+                        <Edit3 className="h-3.5 w-3.5" />
                         Edit
                       </Link>
 
@@ -197,8 +254,9 @@ export default function CategoryListPage() {
                         onClick={() =>
                           openDeleteModal(category.id, category.name)
                         }
-                        className="px-3 py-1.5 bg-kanovi-danger/10 hover:bg-kanovi-danger/20 text-kanovi-danger dark:bg-kanovi-danger/20 dark:hover:bg-kanovi-danger/40 dark:text-red-300 text-xs md:text-sm font-medium rounded-md transition-colors"
+                        className="inline-flex items-center gap-2 rounded-xl bg-[#edf2f4] px-3 py-2 text-xs font-black text-red-500 shadow-[5px_5px_11px_rgba(130,145,152,0.18),-5px_-5px_11px_rgba(255,255,255,0.9)] transition-all active:shadow-[inset_4px_4px_8px_rgba(130,145,152,0.22),inset_-4px_-4px_8px_rgba(255,255,255,0.9)] dark:bg-white/[0.07] dark:text-red-300 dark:shadow-[5px_5px_11px_rgba(0,0,0,0.24),-3px_-3px_9px_rgba(255,255,255,0.03)]"
                       >
+                        <Trash2 className="h-3.5 w-3.5" />
                         Hapus
                       </button>
                     </div>
@@ -210,7 +268,7 @@ export default function CategoryListPage() {
                 <tr>
                   <td
                     colSpan={6}
-                    className="p-6 md:p-8 text-center text-kanovi-coffee/50 dark:text-kanovi-cream/40 italic text-sm md:text-base"
+                    className="px-5 py-12 text-center text-sm font-bold text-[#8a969c] dark:text-white/40"
                   >
                     Kategori tidak ditemukan.
                   </td>
@@ -219,40 +277,45 @@ export default function CategoryListPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-kanovi-paper dark:bg-kanovi-darker rounded-2xl shadow-xl w-full max-w-sm p-6 transform scale-100 transition-all border border-kanovi-cream/50 dark:border-white/5">
-            <div className="flex items-center justify-center w-12 h-12 mx-auto bg-kanovi-danger/10 dark:bg-kanovi-danger/20 rounded-full mb-4">
-              <span className="text-kanovi-danger dark:text-red-400 text-2xl">
-                🗑️
-              </span>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm">
+          <div className="relative w-full max-w-sm rounded-[2rem] bg-[#edf2f4] p-6 shadow-[22px_22px_52px_rgba(0,0,0,0.28),-12px_-12px_30px_rgba(255,255,255,0.30)] dark:bg-[#2f1a13] dark:shadow-[22px_22px_52px_rgba(0,0,0,0.45),-7px_-7px_20px_rgba(255,255,255,0.035)]">
+            <button
+              onClick={() => setIsModalOpen(false)}
+              className="absolute right-5 top-5 rounded-full p-1 text-[#8a969c] hover:text-[#20272c] dark:hover:text-white"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#edf2f4] text-red-500 shadow-[inset_5px_5px_10px_rgba(130,145,152,0.2),inset_-5px_-5px_10px_rgba(255,255,255,0.9)] dark:bg-white/[0.07] dark:text-red-300 dark:shadow-[inset_5px_5px_10px_rgba(0,0,0,0.28),inset_-5px_-5px_10px_rgba(255,255,255,0.035)]">
+              <AlertTriangle className="h-7 w-7" />
             </div>
 
-            <h3 className="text-xl font-bold text-center text-kanovi-coffee dark:text-kanovi-bone mb-2">
+            <h3 className="text-center text-xl font-black text-[#20272c] dark:text-[#f7efe7]">
               Hapus Kategori?
             </h3>
 
-            <p className="text-center text-kanovi-coffee/70 dark:text-kanovi-cream/70 mb-6 text-sm">
+            <p className="mt-2 text-center text-sm font-semibold text-[#6f7a80] dark:text-white/55">
               Yakin ingin menghapus{" "}
-              <span className="font-bold text-kanovi-coffee dark:text-white">
+              <span className="font-black text-[#20272c] dark:text-white">
                 {categoryToDelete?.name}
               </span>
               ?
             </p>
 
-            <div className="flex gap-3">
+            <div className="mt-6 flex gap-3">
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="flex-1 px-4 py-2.5 bg-kanovi-cream/40 hover:bg-kanovi-cream/70 dark:bg-white/5 dark:hover:bg-white/10 text-kanovi-coffee dark:text-kanovi-cream font-medium rounded-xl transition-colors"
+                className={softButtonClass + " flex-1"}
               >
                 Batal
               </button>
 
               <button
                 onClick={confirmDelete}
-                className="flex-1 px-4 py-2.5 bg-kanovi-danger hover:opacity-90 text-white font-medium rounded-xl shadow-sm hover:shadow transition-all"
+                className="flex-1 rounded-2xl bg-red-500 px-4 py-3 text-sm font-black text-white shadow-[7px_7px_16px_rgba(130,145,152,0.18)] transition-all active:scale-[0.98]"
               >
                 Hapus
               </button>

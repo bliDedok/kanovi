@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import { ArrowLeft, ChefHat, Save, Tag, Wallet } from "lucide-react";
 
 type Category = {
   id: number;
@@ -19,6 +20,7 @@ export default function CreateMenuPage() {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
   const router = useRouter();
 
   const getToken = () =>
@@ -118,39 +120,53 @@ export default function CreateMenuPage() {
     }
   };
 
+  const fieldClass =
+    "w-full rounded-2xl bg-[#edf2f4] px-4 py-3 text-sm font-bold text-[#20272c] shadow-[inset_6px_6px_12px_rgba(130,145,152,0.20),inset_-6px_-6px_12px_rgba(255,255,255,0.92)] outline-none placeholder:text-[#8a969c] dark:bg-white/[0.06] dark:text-white dark:shadow-[inset_6px_6px_12px_rgba(0,0,0,0.28),inset_-6px_-6px_12px_rgba(255,255,255,0.035)] dark:placeholder:text-white/35";
+
   return (
-    <div className="max-w-2xl mx-auto w-full">
+    <div className="mx-auto w-full max-w-3xl animate-fade-in space-y-6">
       <Link
         href="/dashboard/menu"
-        className="inline-flex items-center gap-2 text-sm md:text-base text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 transition-colors mb-4 md:mb-6 font-medium"
+        className="inline-flex items-center gap-2 rounded-2xl bg-[#edf2f4] px-4 py-3 text-sm font-black text-[#20272c] shadow-[7px_7px_16px_rgba(130,145,152,0.18),-7px_-7px_16px_rgba(255,255,255,0.92)] transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-[inset_5px_5px_10px_rgba(130,145,152,0.22),inset_-5px_-5px_10px_rgba(255,255,255,0.92)] dark:bg-white/[0.07] dark:text-white dark:shadow-[7px_7px_16px_rgba(0,0,0,0.26),-5px_-5px_14px_rgba(255,255,255,0.035)] dark:active:shadow-[inset_5px_5px_10px_rgba(0,0,0,0.28),inset_-5px_-5px_10px_rgba(255,255,255,0.035)]"
       >
-        <span>←</span> Kembali
+        <ArrowLeft className="h-4 w-4" />
+        Kembali
       </Link>
 
-      <div className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700">
-        <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-6 text-gray-900 dark:text-white">
-          Tambah Menu Baru
-        </h1>
+      <section className="rounded-[2.2rem] border border-white/70 bg-[#edf2f4] p-6 shadow-[18px_18px_42px_rgba(130,145,152,0.20),-14px_-14px_34px_rgba(255,255,255,0.92)] dark:border-white/10 dark:bg-white/[0.055] dark:shadow-[18px_18px_42px_rgba(0,0,0,0.32),-8px_-8px_24px_rgba(255,255,255,0.035)] md:p-8">
+        <div className="mb-7">
+          <h1 className="text-3xl font-black tracking-tight text-[#20272c] dark:text-[#f7efe7] md:text-4xl">
+            Tambah Menu Baru
+          </h1>
 
-        <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6">
+          <p className="mt-3 text-sm font-semibold leading-relaxed text-[#6f7a80] dark:text-white/55 md:text-base">
+            Tambahkan menu baru ke daftar produk Kanovi.
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm md:text-base font-semibold mb-1.5 md:mb-2 text-gray-700 dark:text-gray-300">
+            <label className="mb-2 flex items-center gap-2 text-sm font-black text-[#20272c] dark:text-[#f7efe7]">
+              <ChefHat className="h-4 w-4" />
               Nama Kopi / Menu
             </label>
+
             <input
               type="text"
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Contoh: Kopi Susu Gula Aren"
-              className="w-full p-3 md:p-3.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 dark:text-white placeholder-gray-400 transition-shadow text-sm md:text-base"
+              className={fieldClass}
             />
           </div>
 
           <div>
-            <label className="block text-sm md:text-base font-semibold mb-1.5 md:mb-2 text-gray-700 dark:text-gray-300">
+            <label className="mb-2 flex items-center gap-2 text-sm font-black text-[#20272c] dark:text-[#f7efe7]">
+              <Wallet className="h-4 w-4" />
               Harga (Rp)
             </label>
+
             <input
               type="number"
               required
@@ -158,22 +174,31 @@ export default function CreateMenuPage() {
               value={price}
               onChange={(e) => setPrice(e.target.value)}
               placeholder="Contoh: 15000"
-              className="w-full p-3 md:p-3.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 dark:text-white placeholder-gray-400 transition-shadow text-sm md:text-base"
+              className={fieldClass}
             />
           </div>
 
           <div>
-            <label className="block text-sm md:text-base font-semibold mb-1.5 md:mb-2 text-gray-700 dark:text-gray-300">
+            <label className="mb-2 flex items-center gap-2 text-sm font-black text-[#20272c] dark:text-[#f7efe7]">
+              <Tag className="h-4 w-4" />
               Kategori
             </label>
+
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full p-3 md:p-3.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 dark:text-white text-sm md:text-base"
+              className={`${fieldClass} text-[#20272c] dark:text-white`}
             >
-              <option value="">Pilih kategori</option>
+              <option className="bg-[#edf2f4] text-[#20272c]" value="">
+                Pilih kategori
+              </option>
+
               {categories.map((cat) => (
-                <option key={cat.id} value={String(cat.id)}>
+                <option
+                  key={cat.id}
+                  value={String(cat.id)}
+                  className="bg-[#edf2f4] text-[#20272c]"
+                >
                   {cat.name}
                 </option>
               ))}
@@ -183,16 +208,13 @@ export default function CreateMenuPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className={`w-full p-3 md:p-4 font-bold rounded-xl transition-all shadow-md mt-2 md:mt-4 text-sm md:text-base ${
-              isLoading
-                ? "bg-gray-400 dark:bg-gray-600 cursor-not-allowed text-gray-100"
-                : "bg-green-600 hover:bg-green-700 text-white hover:shadow-lg hover:-translate-y-0.5"
-            }`}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#20272c] px-5 py-4 text-sm font-black text-white shadow-[8px_8px_18px_rgba(130,145,152,0.2)] transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-[#311B14]"
           >
+            <Save className="h-5 w-5" />
             {isLoading ? "Menyimpan..." : "Simpan Menu"}
           </button>
         </form>
-      </div>
+      </section>
     </div>
   );
 }
