@@ -2,6 +2,7 @@ import type { CartItem, PaymentMethod, ReceiptData, ReceiptItem } from "../types
 
 type BuildReceiptParams = {
   orderId: number;
+  queueNumber?: string;
   customerName: string;
   cart: CartItem[];
   paymentMethod: PaymentMethod;
@@ -30,6 +31,7 @@ export const formatReceiptDate = (date: string) =>
 
 export const buildReceiptData = ({
   orderId,
+  queueNumber,
   customerName,
   cart,
   paymentMethod,
@@ -47,8 +49,6 @@ export const buildReceiptData = ({
   }));
 
   const total = items.reduce((sum, item) => sum + item.subtotal, 0);
-  const queueNumber = `#01-${String(orderId).padStart(3, "0")}`;
-
   return {
     orderId,
     orderNumber: `#${orderId}`,
