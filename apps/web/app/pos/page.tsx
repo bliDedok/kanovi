@@ -37,6 +37,7 @@ export default function POSPage() {
 
   const [finalChange, setFinalChange] = useState(0);
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
+  const [queueNumber, setQueueNumber] = useState("");
   const [pendingPaymentMethod, setPendingPaymentMethod] = useState<PaymentMethod | null>(null);
   const [pendingOrderId, setPendingOrderId] = useState<number | null>(null);
   const [shortages, setShortages] = useState<ShortageItem[]>([]);
@@ -199,7 +200,13 @@ export default function POSPage() {
         }
       }
 
-      await api.payOrder(orderId, { paymentMethod: method, overrideStock: override, overrideNote: override ? overrideReason : undefined });
+      const paymentResult = await api.payOrder(orderId, {
+        paymentMethod: method, 
+        overrideStock: override, 
+        overrideNote: override ? overrideReason : undefined 
+      });
+
+      setQueueNumber(paymentResult.order.queueNumber || "");
 
       const total = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
       const cashNumInput = parseInt(cashReceived.replace(/[^0-9]/g, "")) || 0;
@@ -208,6 +215,7 @@ export default function POSPage() {
 
       const receiptData = buildReceiptData({
         orderId,
+        queueNumber: paymentResult.order.queueNumber,
         customerName,
         cart,
         paymentMethod: method,
@@ -217,11 +225,16 @@ export default function POSPage() {
         posName: "POS 1",
       });
 
+      localStorage.setItem(
+      "pending_receipt",
+      JSON.stringify(receiptData)
+    );
+
       setReceipt(receiptData);
       setFinalChange(changeAmount);
       setCart([]); setCustomerName(""); setCashReceived(""); setOverrideReason(""); 
       setIsCashModalOpen(false); setIsQrisModalOpen(false); setIsShortageModalOpen(false);
-      setPendingOrderId(null); setShowSuccessModal(false);
+      setPendingOrderId(null); setShowSuccessModal(true);
       } catch (error: any) {
         const payload = error?.payload;
         const code = error?.code || payload?.error;
@@ -455,8 +468,23 @@ export default function POSPage() {
       <CashModal isOpen={isCashModalOpen} onClose={() => setIsCashModalOpen(false)} totalTagihan={totalTagihan} cashReceived={cashReceived} setCashReceived={setCashReceived} uniqueSuggestedAmounts={uniqueSuggestedAmounts} isEnough={cashNum >= totalTagihan} kembalian={cashNum - totalTagihan} cashNum={cashNum} isSubmitting={isSubmitting} onProcess={handleProcessPayment} />
       <QrisModal isOpen={isQrisModalOpen} onClose={() => setIsQrisModalOpen(false)} totalTagihan={totalTagihan} isSubmitting={isSubmitting} onProcess={handleProcessPayment} />
       <ShortageModal isOpen={isShortageModalOpen} shortages={shortages} overrideReason={overrideReason} setOverrideReason={setOverrideReason} isSubmitting={isSubmitting} onCancel={() => setIsShortageModalOpen(false)} onProcess={handleProcessPayment} pendingMethod={pendingPaymentMethod} />
-      <SuccessModal isOpen={showSuccessModal} onClose={() => setShowSuccessModal(false)} finalChange={finalChange} />
+      <SuccessModal
+        isOpen={showSuccessModal}
+        finalChange={finalChange}
+        queueNumber={queueNumber}
+        onClose={() => {
+          setShowSuccessModal(false);
 
+          const pendingReceipt = localStorage.getItem(
+            "pending_receipt"
+          );
+
+          if (pendingReceipt) {
+            setReceipt(JSON.parse(pendingReceipt));
+            localStorage.removeItem("pending_receipt");
+          }
+        }}
+      />      
       <ExpenseModal isOpen={isExpenseOpen} onClose={() => setIsExpenseOpen(false)} sessionId={activeSession?.id} />
       <ClosingModal isOpen={isClosingOpen} onClose={() => setIsClosingOpen(false)} sessionId={activeSession?.id} onClosingSuccess={() => { setActiveSession(null); setIsClosingOpen(false); localStorage.removeItem("kanovi_branch"); document.cookie = "kanovi_token=; path=/; max-age=0;"; router.push("/login"); }} />
       
@@ -472,7 +500,7 @@ export default function POSPage() {
           receipt={receipt}
           onClose={() => {
             setReceipt(null);
-            setShowSuccessModal(false);
+            setQueueNumber("");
           }}
         />
       )}

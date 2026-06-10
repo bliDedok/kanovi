@@ -153,7 +153,7 @@ export function ShortageModal({ isOpen, shortages, overrideReason, setOverrideRe
 }
 
 // --- MODAL SUCCESS ---
-export function SuccessModal({ isOpen, onClose, finalChange }: { isOpen: boolean, onClose: () => void, finalChange: number }) {
+export function SuccessModal({ isOpen, onClose, finalChange,   queueNumber }: { isOpen: boolean, onClose: () => void, finalChange: number; queueNumber: string }) {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-200 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -162,6 +162,18 @@ export function SuccessModal({ isOpen, onClose, finalChange }: { isOpen: boolean
           <CheckCircle2 className="w-12 h-12 animate-bounce" />
         </div>
         <h2 className="text-2xl font-black mb-2 text-kanovi-coffee dark:text-kanovi-bone">Pembayaran Berhasil!</h2>
+
+        {queueNumber && (
+          <div className="mb-4">
+            <p className="text-xs font-bold uppercase opacity-70">
+              Nomor Antrian
+            </p>
+
+            <p className="text-3xl font-black">
+              {queueNumber}
+            </p>
+          </div>
+        )}
         
         <div className="bg-kanovi-bone dark:bg-black/20 rounded-2xl p-5 mb-8 mt-6 border border-kanovi-cream/50 dark:border-white/5">
           <p className="text-[10px] text-kanovi-coffee/70 dark:text-kanovi-cream/70 font-black tracking-widest uppercase mb-1">Kembalian Customer</p>
