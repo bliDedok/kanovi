@@ -74,12 +74,13 @@ export async function getAllIngredients(_req: FastifyRequest, reply: FastifyRepl
       orderBy: { id: "asc" },
     });
 
-    return reply.code(200).send(
-      ingredients.map((item) => ({
+    return reply.code(200).send({
+      ok: true,
+      data: ingredients.map((item) => ({
         ...item,
         isLowStock: item.stock <= item.minStock,
-      }))
-    );
+      })),
+    });
   } catch (error) {
     console.error(error);
     return reply.code(500).send({ message: "Gagal mengambil data ingredient" });
@@ -97,12 +98,13 @@ export async function getLowStockIngredients(_req: FastifyRequest, reply: Fastif
       orderBy: [{ stock: "asc" }, { id: "asc" }],
     });
 
-    return reply.code(200).send(
-      ingredients.map((item) => ({
+    return reply.code(200).send({
+      ok: true,
+      data: ingredients.map((item) => ({
         ...item,
         isLowStock: true,
-      }))
-    );
+      })),
+    });
   } catch (error) {
     console.error(error);
     return reply.code(500).send({ message: "Gagal mengambil low-stock ingredient" });
@@ -138,6 +140,7 @@ export async function createIngredient(req: FastifyRequest, reply: FastifyReply)
     });
 
     return reply.code(201).send({
+      ok: true,
       message: "Ingredient berhasil ditambahkan",
       data: {
         ...ingredient,
@@ -175,6 +178,7 @@ export async function updateIngredient(req: FastifyRequest, reply: FastifyReply)
     });
 
     return reply.code(200).send({
+      ok: true,
       message: "Ingredient berhasil diupdate",
       data: {
         ...updated,
@@ -238,11 +242,14 @@ export async function adjustIngredientStock(req: FastifyRequest, reply: FastifyR
     });
 
     return reply.code(200).send({
+      ok: true,
       message: "Stok berhasil diadjust",
       data: {
         ingredient: {
           ...result.updatedIngredient,
-          isLowStock: result.updatedIngredient.stock <= result.updatedIngredient.minStock,
+          isLowStock:
+            result.updatedIngredient.stock <=
+            result.updatedIngredient.minStock,
         },
         movement: result.movement,
       },
@@ -263,4 +270,41 @@ export async function adjustIngredientStock(req: FastifyRequest, reply: FastifyR
     console.error(error);
     return reply.code(500).send({ message: "Gagal mengadjust stok" });
   }
+}
+
+export async function getIngredientMovements(
+  req: FastifyRequest,
+  reply: FastifyReply
+) {
+  const id = Number((req.params as { id: string }).id);
+
+  if (!Number.isFinite(id)) {
+    return reply.code(400).send({
+      message: "ID tidak valid",
+    });
+  }
+
+  const ingredient = await prisma.ingredient.findUnique({
+    where: { id },
+  });
+
+  if (!ingredient) {
+    return reply.code(404).send({
+      message: "Ingredient tidak ditemukan",
+    });
+  }
+
+  const movements = await prisma.stockMovement.findMany({
+    where: {
+      ingredientId: id,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  return reply.send({
+    ok: true,
+    data: movements,
+  });
 }
