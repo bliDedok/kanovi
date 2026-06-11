@@ -112,6 +112,37 @@ async function getOrderStockSummary(orderId: number) {
   };
 }
 
+async function generateQueueNumber(tx: any) {
+  const now = new Date();
+
+  const startOfDay = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  );
+
+  const endOfDay = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + 1
+  );
+
+  const todayPaidOrders = await tx.order.count({
+    where: {
+      paymentStatus: "PAID",
+      paidAt: {
+        gte: startOfDay,
+        lt: endOfDay,
+      },
+    },
+  });
+
+  const day = String(now.getDate()).padStart(2, "0");
+  const sequence = String(todayPaidOrders + 1).padStart(3, "0");
+
+  return `#${day}-${sequence}`;
+}
+
 // ====== 3. FUNGSI CONTROLLER ======
 
 export const createOrder = async (req: FastifyRequest, reply: FastifyReply) => {
@@ -320,6 +351,8 @@ export const payOrder = async (req: FastifyRequest, reply: FastifyReply) => {
 
     const didOverride = shortages.length > 0 && overrideStock;
 
+    const queueNumber = await generateQueueNumber(tx);
+
     const paidOrder = await tx.order.update({
       where: { id: lockedOrder.id },
       data: {
@@ -328,6 +361,7 @@ export const payOrder = async (req: FastifyRequest, reply: FastifyReply) => {
         stockOverride: didOverride,
         overrideNote: didOverride ? overrideNote : null,
         paidAt: lockedOrder.paidAt ?? new Date(),
+        queueNumber,
       },
       include: { details: true },
     });

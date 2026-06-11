@@ -45,7 +45,12 @@ export const getActiveQueue = async (request: FastifyRequest, reply: FastifyRepl
           },
         },
       },
-      include: {
+      select: {
+        id: true,
+        queueNumber: true,
+        status: true,
+        orderedAt: true,
+        customerName: true,
         user: true,
         details: {
           where: {
@@ -53,13 +58,23 @@ export const getActiveQueue = async (request: FastifyRequest, reply: FastifyRepl
             prepStatus: { not: "SERVED" },
           },
           include: {
-            menu: { include: { category: true } },
+            menu: {
+              include: {
+                category: true,
+              },
+            },
           },
-          orderBy: { id: "asc" },
+          orderBy: {
+            id: "asc",
+          },
         },
       },
-      orderBy: { orderedAt: "asc" },
+      orderBy: {
+        orderedAt: "asc",
+      },
     });
+    
+    console.log(orders[0]);
 
     return reply.send({ success: true, data: orders });
   } catch (error) {
@@ -153,18 +168,31 @@ export const updateOrderItemStatus = async (
 export const getOrderHistory = async (request: FastifyRequest, reply: FastifyReply) => {
   try {
     const orders = await prisma.order.findMany({
-      where: { paymentStatus: "PAID" },
-      include: {
+      where: {
+        paymentStatus: "PAID",
+      },
+      select: {
+        id: true,
+        queueNumber: true,
+        status: true,
+        paymentMethod: true,
+        totalPrice: true,
+        orderedAt: true,
+        customerName: true,
         user: true,
         details: {
           include: {
             menu: {
-              include: { category: true },
+              include: {
+                category: true,
+              },
             },
           },
         },
       },
-      orderBy: { orderedAt: "desc" },
+      orderBy: {
+        orderedAt: "desc",
+      },
     });
 
     return reply.send({ success: true, data: orders });

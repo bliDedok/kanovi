@@ -17,9 +17,9 @@ export default function KitchenOrderCard({ order, now, onAdvanceStatus }: Props)
     <div className="rounded-2xl bg-kanovi-bone dark:bg-[#1a1a1a] border border-kanovi-cream/50 dark:border-white/5 shadow-sm p-4">
       <div className="flex items-start justify-between mb-4">
         <div>
-          <h2 className="text-lg font-bold text-kanovi-coffee dark:text-white">
-            Order #{order.id}
-          </h2>
+          <h3 className="text-lg font-bold text-kanovi-coffee dark:text-white">
+            {order.queueNumber || `#${order.id}`}
+          </h3>
           <p className="text-sm text-kanovi-coffee/70 dark:text-gray-400">
             {order.customerName || "Walk-in"}
           </p>

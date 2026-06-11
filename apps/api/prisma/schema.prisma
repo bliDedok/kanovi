@@ -154,6 +154,7 @@ model Recipe {
 
 model Order {
   id            Int            @id @default(autoincrement()) 
+  queueNumber String? @unique
   userId        Int            
   origin        Location       
   customerName  String?        

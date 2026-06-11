@@ -34,6 +34,7 @@ export type CartItem = Menu & {
 
 export type OrderDetail = {
   id: number;
+  queueNumber?: string;
   orderId: number;
   menuId: number;
   qty: number;
@@ -50,6 +51,7 @@ export type OrderDetail = {
 
 export type Order = {
   id: number;
+  queueNumber?: string;
   customerName: string | null;
   status: "NEW" | "IN_PROGRESS" | "READY" | "DONE" | "CANCELED";
   paymentStatus: "UNPAID" | "PAID" | "VOID";
@@ -164,7 +166,7 @@ export type ReceiptItem = {
 export type ReceiptData = {
   orderId: number;
   orderNumber: string;
-  queueNumber: string;
+  queueNumber?: string;
   customerName?: string;
   employeeName: string;
   posName: string;
