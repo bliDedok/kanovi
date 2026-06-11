@@ -1,12 +1,15 @@
 "use client";
 
-import { ArrowLeft, Coffee, Moon, Sun } from "lucide-react";
+import { ArrowLeft, Coffee, Moon, Sun, Bell, BellOff } from "lucide-react";
 
 type Props = {
   currentTime: Date;
   isDarkMode: boolean;
   onToggleTheme: () => void;
   onBack: () => void;
+
+  soundEnabled: boolean;
+  onToggleSound: () => void;
 };
 
 export default function KitchenQueueHeader({
@@ -14,6 +17,8 @@ export default function KitchenQueueHeader({
   isDarkMode,
   onToggleTheme,
   onBack,
+  soundEnabled,
+  onToggleSound,
 }: Props) {
   return (
     <div className="flex justify-between items-center mb-6 bg-kanovi-bone dark:bg-[#1a1a1a] p-4 rounded-2xl shadow-sm border border-kanovi-cream/50 dark:border-white/5">
@@ -39,6 +44,25 @@ export default function KitchenQueueHeader({
             minute: "2-digit",
           })}
         </div>
+
+        <button
+          onClick={onToggleSound}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl
+          bg-white dark:bg-gray-800
+          border border-kanovi-cream/50 dark:border-transparent
+          hover:bg-gray-100 dark:hover:bg-gray-700
+          transition"
+        >
+          {soundEnabled ? (
+            <Bell className="w-5 h-5 text-green-500" />
+          ) : (
+            <BellOff className="w-5 h-5 text-red-500" />
+          )}
+
+          <span className="hidden md:inline text-sm font-medium text-kanovi-coffee dark:text-white">
+            {soundEnabled ? "ON" : "OFF"}
+          </span>
+        </button>
 
         <button
           onClick={onToggleTheme}
