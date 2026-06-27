@@ -81,8 +81,19 @@ export default function InventoryPage() {
     try {
       setLoading(true);
 
-      const data = await api.getIngredients();
-      setIngredients(Array.isArray(data) ? data : []);
+      const result: any = await api.getIngredients();
+
+      if (Array.isArray(result)) {
+        setIngredients(result);
+        return;
+      }
+
+      if (Array.isArray(result?.data)) {
+        setIngredients(result.data);
+        return;
+      }
+
+      setIngredients([]);
     } catch (error: any) {
       toast.error(error?.message || "Gagal mengambil data");
     } finally {

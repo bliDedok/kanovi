@@ -1,11 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import { Printer, ReceiptText, X } from "lucide-react";
 import type { ReceiptData } from "../../types";
 import { formatCurrency, formatReceiptDate } from "../../lib/receipt";
-
-type PrintMode = "POS" | "KITCHEN";
 
 type ReceiptModalProps = {
   receipt: ReceiptData;
@@ -13,43 +10,220 @@ type ReceiptModalProps = {
 };
 
 export default function ReceiptModal({ receipt, onClose }: ReceiptModalProps) {
-  const [printMode, setPrintMode] = useState<PrintMode>("POS");
-  const hasAutoPrintedKitchen = useRef(false);
-
-  useEffect(() => {
-    if (hasAutoPrintedKitchen.current) return;
-
-    hasAutoPrintedKitchen.current = true;
-    setPrintMode("KITCHEN");
-
-    const printTimer = window.setTimeout(() => {
-      window.print();
-    }, 300);
-
-    const restorePosPrintMode = () => {
-      setPrintMode("POS");
-    };
-
-    window.addEventListener("afterprint", restorePosPrintMode);
-
-    return () => {
-      window.clearTimeout(printTimer);
-      window.removeEventListener("afterprint", restorePosPrintMode);
-    };
-  }, []);
+  const logoPath = "/images/kanovi_Fix.png";
 
   const handlePrintPos = () => {
-    setPrintMode("POS");
+    const printWindow = window.open("", "_blank", "width=420,height=700");
 
-    window.setTimeout(() => {
-      window.print();
-    }, 100);
+    if (!printWindow) {
+      alert("Popup print diblokir browser. Izinkan popup untuk mencetak struk.");
+      return;
+    }
+
+    const itemsHtml = receipt.items
+      .map(
+        (item) => `
+          <div class="item">
+            <div class="item-row">
+              <strong>${item.name} (UND)</strong>
+              <span>${formatCurrency(item.subtotal)}</span>
+            </div>
+            <div class="muted">${item.qty} x ${formatCurrency(item.price)}</div>
+          </div>
+        `
+      )
+      .join("");
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Kanovi POS Receipt</title>
+          <style>
+            @page {
+              size: 80mm auto;
+              margin: 0;
+            }
+
+            * {
+              box-sizing: border-box;
+            }
+
+            html,
+            body {
+              width: 80mm;
+              margin: 0;
+              padding: 0;
+              background: #ffffff;
+              color: #000000;
+              font-family: Arial, sans-serif;
+            }
+
+            body {
+              padding: 4mm;
+            }
+
+            .receipt {
+              width: 72mm;
+              max-width: 72mm;
+              background: #ffffff;
+              color: #000000;
+              font-size: 11px;
+              line-height: 1.45;
+            }
+
+            .center {
+              text-align: center;
+            }
+
+            .logo {
+              width: 22mm;
+              height: 22mm;
+              object-fit: contain;
+              margin-bottom: 2mm;
+            }
+
+            .store-name {
+              font-size: 14px;
+              font-weight: 700;
+              margin-bottom: 2mm;
+            }
+
+            .address {
+              font-size: 10px;
+              color: #444;
+              line-height: 1.45;
+            }
+
+            .section-title {
+              margin-top: 4mm;
+              font-size: 12px;
+              font-weight: 700;
+              letter-spacing: 0.5px;
+            }
+
+            .line {
+              border-top: 1px solid #000;
+              margin: 3mm 0;
+            }
+
+            .row,
+            .item-row,
+            .total-row {
+              display: flex;
+              justify-content: space-between;
+              gap: 8px;
+            }
+
+            .item {
+              margin-bottom: 3mm;
+            }
+
+            .muted {
+              color: #555;
+              margin-top: 1mm;
+            }
+
+            .total-row {
+              font-size: 18px;
+              font-weight: 900;
+              margin-bottom: 2mm;
+            }
+
+            .footer {
+              text-align: center;
+              font-size: 11px;
+              line-height: 1.5;
+            }
+
+            .bottom {
+              display: flex;
+              justify-content: space-between;
+              margin-top: 5mm;
+              font-size: 11px;
+            }
+          </style>
+        </head>
+
+        <body>
+          <div class="receipt">
+            <div class="center">
+              <img src="${logoPath}" class="logo" />
+              <div class="store-name">${receipt.storeName}</div>
+              <div class="address">${receipt.storeAddress}</div>
+              <div class="section-title">KANOVI ESCAPE</div>
+            </div>
+
+            <div style="margin-top: 5mm;">
+              <div class="row">
+                <span>Employee:</span>
+                <span>${receipt.employeeName}</span>
+              </div>
+              <div class="row">
+                <span>POS:</span>
+                <span>${receipt.posName}</span>
+              </div>
+            </div>
+
+            <div class="line"></div>
+
+            ${itemsHtml}
+
+            <div class="line"></div>
+
+            <div class="total-row">
+              <span>Total</span>
+              <span>${formatCurrency(receipt.total)}</span>
+            </div>
+
+            <div class="row">
+              <span>${receipt.paymentMethod === "CASH" ? "Cash" : "QRIS"}</span>
+              <span>${formatCurrency(receipt.paidAmount)}</span>
+            </div>
+
+            ${
+              receipt.paymentMethod === "CASH"
+                ? `
+                  <div class="row">
+                    <span>Change</span>
+                    <span>${formatCurrency(receipt.changeAmount)}</span>
+                  </div>
+                `
+                : ""
+            }
+
+            <div class="line"></div>
+
+            <div class="footer">
+              <div>Thanks for choosing Kanovi Escape</div>
+              <div>Get the latest updates on promos, seasonal menus, and events by following us on Instagram</div>
+              <div>@kanovi escape</div>
+            </div>
+
+            <div class="bottom">
+              <span>${formatReceiptDate(receipt.paidAt)}</span>
+              <span>${receipt.queueNumber}</span>
+            </div>
+          </div>
+
+          <script>
+            window.onload = function () {
+              setTimeout(function () {
+                window.print();
+              }, 300);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
   };
 
   return (
-    <div className="fixed inset-0 z-70 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm print:static print:bg-white print:p-0">
-      <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-kanovi-paper p-5 shadow-2xl dark:bg-kanovi-darker print:max-h-none print:max-w-none print:overflow-visible print:rounded-none print:bg-white print:p-0 print:shadow-none">
-        <div className="mb-4 flex items-center justify-between print:hidden">
+    <div className="fixed inset-0 z-70 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-kanovi-paper p-5 shadow-2xl dark:bg-kanovi-darker">
+        <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-kanovi-coffee dark:text-kanovi-bone">
               Preview Struk POS
@@ -69,18 +243,19 @@ export default function ReceiptModal({ receipt, onClose }: ReceiptModalProps) {
           </button>
         </div>
 
-        <div className="flex justify-center print:block">
-          <div
-            id="pos-receipt-print-area"
-            data-print-active={printMode === "POS"}
-            className="receipt-print-target receipt-paper w-67.5 rounded-2xl bg-white p-4 text-black shadow-inner print:w-[80mm] print:rounded-none print:p-0 print:shadow-none"
-          >
+        <div className="flex justify-center">
+          <div className="w-[80mm] max-w-[80mm] rounded-2xl bg-white p-4 text-black shadow-inner">
             <div className="text-center">
-              <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center text-2xl font-black leading-none tracking-tighter">
-                <div className="-rotate-90">KANOVI</div>
+              <div className="mx-auto mb-3 flex justify-center">
+                <img
+                  src={logoPath}
+                  alt="Kanovi Logo"
+                  className="h-50 w-50 object-contain"
+                />
               </div>
 
               <h1 className="text-sm font-bold">{receipt.storeName}</h1>
+
               <p className="mx-auto mt-2 max-w-xs text-[10px] leading-relaxed text-black/70">
                 {receipt.storeAddress}
               </p>
@@ -95,6 +270,7 @@ export default function ReceiptModal({ receipt, onClose }: ReceiptModalProps) {
                 <span>Employee:</span>
                 <span>{receipt.employeeName}</span>
               </div>
+
               <div className="flex justify-between gap-4">
                 <span>POS:</span>
                 <span>{receipt.posName}</span>
@@ -110,6 +286,7 @@ export default function ReceiptModal({ receipt, onClose }: ReceiptModalProps) {
                     <span className="font-medium">{item.name} (UND)</span>
                     <span>{formatCurrency(item.subtotal)}</span>
                   </div>
+
                   <p className="mt-1 text-black/70">
                     {item.qty} x {formatCurrency(item.price)}
                   </p>
@@ -143,8 +320,8 @@ export default function ReceiptModal({ receipt, onClose }: ReceiptModalProps) {
             <div className="text-center text-xs leading-relaxed">
               <p>Thanks for choosing Kanovi Escape</p>
               <p>
-                Get the latest updates on promos, seasonal menus, and events by following us on
-                Instagram
+                Get the latest updates on promos, seasonal menus, and events by
+                following us on Instagram
               </p>
               <p>@kanovi escape</p>
             </div>
@@ -154,50 +331,9 @@ export default function ReceiptModal({ receipt, onClose }: ReceiptModalProps) {
               <span>{receipt.queueNumber}</span>
             </div>
           </div>
-
-          <div
-            id="kitchen-receipt-print-area"
-            data-print-active={printMode === "KITCHEN"}
-            className="receipt-print-target hidden w-67.5 rounded-2xl bg-white p-4 text-black shadow-inner print:block print:w-[80mm] print:rounded-none print:p-0 print:shadow-none"
-          >
-            <div className="space-y-8">
-              {receipt.items.map((item, index) => (
-                <div key={item.menuId} className="kitchen-ticket break-inside-avoid">
-                  <h1 className="text-center text-3xl font-black tracking-wide">
-                    {receipt.queueNumber}
-                  </h1>
-
-                  <div className="mt-5 space-y-2 text-base">
-                    <p>{formatReceiptDate(receipt.paidAt)}</p>
-                    <p>
-                      {receipt.employeeName}, {receipt.posName}
-                    </p>
-                  </div>
-
-                  <div className="my-4 border-t border-black" />
-
-                  <p className="text-2xl font-black">
-                    {item.qty} x {item.name}
-                  </p>
-
-                  <div className="my-4 border-t border-black" />
-
-                  {receipt.customerName && (
-                    <p className="text-sm font-semibold">
-                      Customer: {receipt.customerName}
-                    </p>
-                  )}
-
-                  {index < receipt.items.length - 1 && (
-                    <div className="mt-8 border-b border-dashed border-black pb-8 print:break-after-page" />
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 print:hidden">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <button
             type="button"
             onClick={handlePrintPos}
