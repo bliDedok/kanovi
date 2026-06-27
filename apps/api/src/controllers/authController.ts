@@ -6,7 +6,7 @@ import jwt from 'jsonwebtoken';
 const prisma = new PrismaClient();
 
 export const loginUser = async (req: FastifyRequest, reply: FastifyReply) => {
-  // Ambil data dari body (di-cast ke any sementara karena tipe body bawaan Fastify adalah unknown)
+
   const { username, password } = req.body as any;
 
   if (!username) {
@@ -28,10 +28,16 @@ export const loginUser = async (req: FastifyRequest, reply: FastifyReply) => {
       return reply.code(401).send({ message: "Username atau password salah" });
     }
 
+    if (!process.env.JWT_SECRET) {
+      return reply.code(500).send({
+        message: "JWT_SECRET belum diatur di server.",
+      });
+    }
+
     const token = jwt.sign(
-      { userId: user.id, role: user.role }, 
-      process.env.JWT_SECRET || 'rahasia_negara', 
-      { expiresIn: '1d' }
+      { userId: user.id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
     );
 
     return reply.code(200).send({ 
