@@ -2,10 +2,11 @@ import { Order } from "../../types";
 
 type HistoryCardProps = {
   order: Order & { dailyNo: number };
-  onVoid?: (id: number) => void; // <-- Tambahan Prop onVoid
+  onVoid: (orderId: number) => Promise<void>;
+  onReprint: (order: Order & { dailyNo: number }) => void;
 };
 
-export default function HistoryCard({ order, onVoid }: HistoryCardProps) {
+export default function HistoryCard({order,onVoid,onReprint,}: HistoryCardProps) {
   // Cek apakah order ini sudah di-void
   const isVoided = order.paymentStatus === "VOID";
 
@@ -58,11 +59,21 @@ export default function HistoryCard({ order, onVoid }: HistoryCardProps) {
         </span>
       </div>
 
-      {/* TOMBOL AKSI VOID */}
-      <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700/50 flex justify-end">
+      <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700/50 flex flex-wrap justify-end gap-2">
+        {!isVoided && (
+          <button
+            type="button"
+            onClick={() => onReprint(order)}
+            className="px-4 py-2 bg-kanovi-wood text-white hover:bg-kanovi-coffee rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest transition-all shadow-sm active:scale-95"
+          >
+            Cetak Ulang
+          </button>
+        )}
+
         {!isVoided ? (
-          <button 
-            onClick={() => onVoid && onVoid(order.id)}
+          <button
+            type="button"
+            onClick={() => onVoid(order.id)}
             className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-500 hover:text-white dark:bg-red-500/10 dark:hover:bg-red-500 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest transition-all shadow-sm active:scale-95"
           >
             Void Transaksi

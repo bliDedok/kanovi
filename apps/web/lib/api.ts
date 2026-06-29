@@ -65,7 +65,15 @@ export const api = {
 
   getHistory: () => fetchApi("/api/orders/history"),
 
-  getIngredients: () => fetchApi("/api/ingredients"),
+  getIngredients: async () => {
+    const result = await fetchApi("/api/ingredients");
+
+    return Array.isArray(result)
+      ? result
+      : Array.isArray(result?.data)
+        ? result.data
+        : [];
+  },
 
   getStockMovements: (params?: {
   startDate?: string;

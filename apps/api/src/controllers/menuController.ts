@@ -6,7 +6,7 @@ const isOwner = (req: FastifyRequest) => {
   return user && user.role === "OWNER";
 };
 
-// 1. CREATE MENU
+
 export const createMenu = async (req: FastifyRequest, reply: FastifyReply) => {
   if (!isOwner(req)) {
     return reply.code(403).send({ message: "Akses ditolak. Hanya Owner." });
@@ -63,7 +63,7 @@ export const createMenu = async (req: FastifyRequest, reply: FastifyReply) => {
   }
 };
 
-// 2. GET ALL MENUS
+
 export const getAllMenus = async (_req: FastifyRequest, reply: FastifyReply) => {
   try {
     const menus = await prisma.menu.findMany({
@@ -77,11 +77,15 @@ export const getAllMenus = async (_req: FastifyRequest, reply: FastifyReply) => 
 
     return reply.code(200).send(menus);
   } catch (error) {
-    return reply.code(500).send({ message: "Gagal mengambil data menu" });
+    console.error("Gagal mengambil data menu:", error);
+
+    return reply.code(500).send({
+      message: "Gagal mengambil data menu",
+    });
   }
 };
 
-// 3. GET MENU BY ID
+
 export const getMenuById = async (req: FastifyRequest, reply: FastifyReply) => {
   const { id } = req.params as { id: string };
 
