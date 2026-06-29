@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { ShoppingCart, Trash2, Menu as MenuIcon, X, MonitorPlay, History, LogOut, Receipt, Calculator, BookmarkPlus, Library } from "lucide-react";
+import {ShoppingCart, Trash2, Menu as MenuIcon, BookmarkPlus, Library,} from "lucide-react";
 import { PaymentMethod, Menu, CartItem, ShortageItem, ReceiptData } from "../../types";
 import { api } from "../../lib/api";
 import { buildReceiptData } from "../../lib/receipt";
@@ -10,6 +10,7 @@ import { ClearCartModal, CashModal, QrisModal, ShortageModal, SuccessModal, Hold
 import OpeningSessionModal from "../components/OpeningSessionModal";
 import { ExpenseModal, ClosingModal } from "../components/FinanceModals";
 import ReceiptModal from "../components/ReceiptModal";
+import BurgerMenu from "../components/BurgerMenu";
 
 export default function POSPage() {
   const router = useRouter();
@@ -57,6 +58,7 @@ export default function POSPage() {
       setIsCheckingSession(false); 
     }
   };
+
 
   useEffect(() => {
     const savedBranch = localStorage.getItem("kanovi_branch");
@@ -436,44 +438,13 @@ export default function POSPage() {
         </div>
       </aside>
 
-      {isSidebarOpen && (
-        <div className="fixed inset-0 z-100 flex">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" onClick={() => setIsSidebarOpen(false)} />
-          <div className="relative w-72 bg-kanovi-paper/95 dark:bg-kanovi-darker/95 backdrop-blur-md h-full shadow-2xl flex flex-col border-r border-kanovi-cream/30 dark:border-white/5 animate-in slide-in-from-left duration-300">
-            <div className="p-6 border-b border-kanovi-cream/30 dark:border-white/5 flex items-center justify-between">
-              <div><h2 className="text-xl font-bold text-kanovi-coffee dark:text-white">Menu Navigasi</h2><p className="text-xs text-kanovi-coffee/60 dark:text-kanovi-cream/60">POS Kanovi</p></div>
-              <button onClick={() => setIsSidebarOpen(false)} className="p-2"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="p-4 space-y-2 flex-1">
-              <button onClick={() => router.push('/queue')} className="w-full flex items-center gap-3 px-4 py-4 rounded-xl hover:bg-yellow-500/10 text-kanovi-coffee dark:text-white hover:text-yellow-600 font-semibold transition-colors"><MonitorPlay className="w-5 h-5" /> Layar Antrian</button>
-              <button onClick={() => router.push('/history')} className="w-full flex items-center gap-3 px-4 py-4 rounded-xl hover:bg-kanovi-bone dark:hover:bg-white/5 text-kanovi-coffee dark:text-white font-semibold transition-colors"><History className="w-5 h-5" /> Riwayat Transaksi</button>
-              
-              <button onClick={() => { setIsSidebarOpen(false); setIsExpenseOpen(true); }} className="w-full flex items-center gap-3 px-4 py-4 rounded-xl hover:bg-red-500/10 text-kanovi-coffee dark:text-white hover:text-red-600 font-semibold transition-colors">
-                <Receipt className="w-5 h-5 text-red-500" /> Catat Pengeluaran
-              </button>
-              <button onClick={() => { setIsSidebarOpen(false); setIsClosingOpen(true); }} className="w-full flex items-center gap-3 px-4 py-4 rounded-xl hover:bg-orange-500/10 text-kanovi-coffee dark:text-white hover:text-orange-600 font-semibold transition-colors">
-                <Calculator className="w-5 h-5 text-orange-500" /> Tutup Kasir (Closing)
-              </button>
-            </div>
-            <div className="p-4 border-t border-kanovi-cream/30 dark:border-white/5">
-              <button onClick={() => { localStorage.removeItem("kanovi_branch"); document.cookie = "kanovi_token=; path=/; max-age=0;"; router.push("/login"); }} className="w-full flex items-center gap-3 px-4 py-4 rounded-xl bg-red-50 text-red-600 font-bold transition-colors">
-                <LogOut className="w-5 h-5" /> Keluar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
+      
+      <BurgerMenu isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} onOpenExpense={() => setIsExpenseOpen(true)} onOpenClosing={() => setIsClosingOpen(true)} />
       <ClearCartModal isOpen={isClearCartModalOpen} onClose={() => setIsClearCartModalOpen(false)} onConfirm={() => { setCart([]); setIsClearCartModalOpen(false); }} />
       <CashModal isOpen={isCashModalOpen} onClose={() => setIsCashModalOpen(false)} totalTagihan={totalTagihan} cashReceived={cashReceived} setCashReceived={setCashReceived} uniqueSuggestedAmounts={uniqueSuggestedAmounts} isEnough={cashNum >= totalTagihan} kembalian={cashNum - totalTagihan} cashNum={cashNum} isSubmitting={isSubmitting} onProcess={handleProcessPayment} />
       <QrisModal isOpen={isQrisModalOpen} onClose={() => setIsQrisModalOpen(false)} totalTagihan={totalTagihan} isSubmitting={isSubmitting} onProcess={handleProcessPayment} />
       <ShortageModal isOpen={isShortageModalOpen} shortages={shortages} overrideReason={overrideReason} setOverrideReason={setOverrideReason} isSubmitting={isSubmitting} onCancel={() => setIsShortageModalOpen(false)} onProcess={handleProcessPayment} pendingMethod={pendingPaymentMethod} />
-      <SuccessModal
-        isOpen={showSuccessModal}
-        finalChange={finalChange}
-        queueNumber={queueNumber}
-        onClose={() => {
-          setShowSuccessModal(false);
+      <SuccessModal isOpen={showSuccessModal} finalChange={finalChange} queueNumber={queueNumber} onClose={() => { setShowSuccessModal(false);
 
           const pendingReceipt = localStorage.getItem(
             "pending_receipt"
