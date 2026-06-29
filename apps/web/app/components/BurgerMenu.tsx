@@ -10,7 +10,7 @@ import {
   Calculator,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { printTestReceipt } from "../../lib/printer";
+import { api } from "../../lib/api";
 
 type BurgerMenuProps = {
   isOpen: boolean;
@@ -36,12 +36,16 @@ export default function BurgerMenu({
     router.push("/login");
   };
 
-  const handleTestPrint = () => {
+  const handleTestPrint = async () => {
     try {
-      printTestReceipt();
+      await api.directTestPrint();
+      alert("Test print berhasil dikirim ke printer.");
       onClose();
     } catch (error: any) {
-      alert(error?.message || "Gagal menjalankan test print.");
+      alert(
+        error?.message ||
+          "Gagal direct test print. Pastikan printer GEZHI/Woya tersambung USB."
+      );
     }
   };
 

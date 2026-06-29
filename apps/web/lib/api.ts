@@ -1,3 +1,4 @@
+import type { ReceiptData } from "../types";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:3001";
 
 // Fungsi untuk mengambil token dari cookie
@@ -121,17 +122,17 @@ export const api = {
       body: JSON.stringify({ qtyChange, reason }),
     }),
 
-createOrder: (data: { 
-  origin: string; 
-  customerName?: string; 
-  branch: string;    
-  sessionId: number; 
-  items: any[] 
-}) =>
-  fetchApi("/api/orders", {
-    method: "POST",
-    body: JSON.stringify(data),
-  }),
+  createOrder: (data: { 
+    origin: string; 
+    customerName?: string; 
+    branch: string;    
+    sessionId: number; 
+    items: any[] 
+  }) =>
+    fetchApi("/api/orders", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 
   checkOrderStock: (orderId: number) =>
     fetchApi(`/api/orders/${orderId}/stock-check`),
@@ -187,4 +188,22 @@ getFinanceReport: (from?: string, to?: string) =>
       method: "POST",
       body: JSON.stringify({ pin }),
     }),
+
+  directTestPrint: () =>
+    fetchApi("/api/printer/test", {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
+
+  directPrintReceipt: (receipt: any) =>
+    fetchApi("/api/printer/receipt", {
+      method: "POST",
+      body: JSON.stringify(receipt),
+    }),
+
+  printKitchenReceipt: (receipt: ReceiptData) =>
+  fetchApi("/api/printer/kitchen", {
+    method: "POST",
+    body: JSON.stringify(receipt),
+  }),
 };

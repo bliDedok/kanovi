@@ -3,6 +3,7 @@
 import { Printer, ReceiptText, X } from "lucide-react";
 import type { ReceiptData } from "../../types";
 import { formatCurrency, formatReceiptDate } from "../../lib/receipt";
+import { api } from "../../lib/api";
 
 type ReceiptModalProps = {
   receipt: ReceiptData;
@@ -12,212 +13,16 @@ type ReceiptModalProps = {
 export default function ReceiptModal({ receipt, onClose }: ReceiptModalProps) {
   const logoPath = "/images/kanovi_Fix.png";
 
-  const handlePrintPos = () => {
-    const printWindow = window.open("", "_blank", "width=420,height=700");
-
-    if (!printWindow) {
-      alert("Popup print diblokir browser. Izinkan popup untuk mencetak struk.");
-      return;
+  const handlePrintPos = async () => {
+    try {
+      await api.directPrintReceipt(receipt);
+      alert("Struk berhasil dikirim ke printer.");
+    } catch (error: any) {
+      alert(
+        error?.message ||
+          "Direct print gagal. Pastikan printer GEZHI/Woya tersambung USB."
+      );
     }
-
-    const itemsHtml = receipt.items
-      .map(
-        (item) => `
-          <div class="item">
-            <div class="item-row">
-              <strong>${item.name} (UND)</strong>
-              <span>${formatCurrency(item.subtotal)}</span>
-            </div>
-            <div class="muted">${item.qty} x ${formatCurrency(item.price)}</div>
-          </div>
-        `
-      )
-      .join("");
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Kanovi POS Receipt</title>
-          <style>
-            @page {
-              size: 80mm auto;
-              margin: 0;
-            }
-
-            * {
-              box-sizing: border-box;
-            }
-
-            html,
-            body {
-              width: 80mm;
-              margin: 0;
-              padding: 0;
-              background: #ffffff;
-              color: #000000;
-              font-family: Arial, sans-serif;
-            }
-
-            body {
-              padding: 4mm;
-            }
-
-            .receipt {
-              width: 72mm;
-              max-width: 72mm;
-              background: #ffffff;
-              color: #000000;
-              font-size: 11px;
-              line-height: 1.45;
-            }
-
-            .center {
-              text-align: center;
-            }
-
-            .logo {
-              width: 22mm;
-              height: 22mm;
-              object-fit: contain;
-              margin-bottom: 2mm;
-            }
-
-            .store-name {
-              font-size: 14px;
-              font-weight: 700;
-              margin-bottom: 2mm;
-            }
-
-            .address {
-              font-size: 10px;
-              color: #444;
-              line-height: 1.45;
-            }
-
-            .section-title {
-              margin-top: 4mm;
-              font-size: 12px;
-              font-weight: 700;
-              letter-spacing: 0.5px;
-            }
-
-            .line {
-              border-top: 1px solid #000;
-              margin: 3mm 0;
-            }
-
-            .row,
-            .item-row,
-            .total-row {
-              display: flex;
-              justify-content: space-between;
-              gap: 8px;
-            }
-
-            .item {
-              margin-bottom: 3mm;
-            }
-
-            .muted {
-              color: #555;
-              margin-top: 1mm;
-            }
-
-            .total-row {
-              font-size: 18px;
-              font-weight: 900;
-              margin-bottom: 2mm;
-            }
-
-            .footer {
-              text-align: center;
-              font-size: 11px;
-              line-height: 1.5;
-            }
-
-            .bottom {
-              display: flex;
-              justify-content: space-between;
-              margin-top: 5mm;
-              font-size: 11px;
-            }
-          </style>
-        </head>
-
-        <body>
-          <div class="receipt">
-            <div class="center">
-              <img src="${logoPath}" class="logo" />
-              <div class="store-name">${receipt.storeName}</div>
-              <div class="address">${receipt.storeAddress}</div>
-              <div class="section-title">KANOVI ESCAPE</div>
-            </div>
-
-            <div style="margin-top: 5mm;">
-              <div class="row">
-                <span>Employee:</span>
-                <span>${receipt.employeeName}</span>
-              </div>
-              <div class="row">
-                <span>POS:</span>
-                <span>${receipt.posName}</span>
-              </div>
-            </div>
-
-            <div class="line"></div>
-
-            ${itemsHtml}
-
-            <div class="line"></div>
-
-            <div class="total-row">
-              <span>Total</span>
-              <span>${formatCurrency(receipt.total)}</span>
-            </div>
-
-            <div class="row">
-              <span>${receipt.paymentMethod === "CASH" ? "Cash" : "QRIS"}</span>
-              <span>${formatCurrency(receipt.paidAmount)}</span>
-            </div>
-
-            ${
-              receipt.paymentMethod === "CASH"
-                ? `
-                  <div class="row">
-                    <span>Change</span>
-                    <span>${formatCurrency(receipt.changeAmount)}</span>
-                  </div>
-                `
-                : ""
-            }
-
-            <div class="line"></div>
-
-            <div class="footer">
-              <div>Thanks for choosing Kanovi Escape</div>
-              <div>Get the latest updates on promos, seasonal menus, and events by following us on Instagram</div>
-              <div>@kanovi escape</div>
-            </div>
-
-            <div class="bottom">
-              <span>${formatReceiptDate(receipt.paidAt)}</span>
-              <span>${receipt.queueNumber}</span>
-            </div>
-          </div>
-
-          <script>
-            window.onload = function () {
-              setTimeout(function () {
-                window.print();
-              }, 300);
-            };
-          </script>
-        </body>
-      </html>
-    `);
-
-    printWindow.document.close();
   };
 
   return (
@@ -303,7 +108,9 @@ export default function ReceiptModal({ receipt, onClose }: ReceiptModalProps) {
               </div>
 
               <div className="flex justify-between text-xs">
-                <span>{receipt.paymentMethod === "CASH" ? "Cash" : "QRIS"}</span>
+                <span>
+                  {receipt.paymentMethod === "CASH" ? "Cash" : "QRIS"}
+                </span>
                 <span>{formatCurrency(receipt.paidAmount)}</span>
               </div>
 
