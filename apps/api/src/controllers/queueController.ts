@@ -169,16 +169,26 @@ export const getOrderHistory = async (request: FastifyRequest, reply: FastifyRep
   try {
     const orders = await prisma.order.findMany({
       where: {
-        paymentStatus: "PAID",
+        paymentStatus: {
+          in: ["PAID", "VOID"],
+        },
       },
       select: {
         id: true,
         queueNumber: true,
         status: true,
+        paymentStatus: true,
         paymentMethod: true,
         totalPrice: true,
         orderedAt: true,
+        paidAt: true,
         customerName: true,
+
+        // VOID AUDIT LOG
+        voidReason: true,
+        voidedBy: true,
+        voidedAt: true,
+
         user: true,
         details: {
           include: {

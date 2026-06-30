@@ -154,13 +154,13 @@ model Recipe {
 
 model Order {
   id            Int            @id @default(autoincrement()) 
-  queueNumber String? @unique
+  queueNumber   String?        @unique
   userId        Int            
   origin        Location       
   customerName  String?        
   
   // --- BINDING KE FINANCE ---
-  sessionId     Int?           // ID Sesi Kasir
+  sessionId     Int?           
   session       CashSession?   @relation(fields: [sessionId], references: [id])
   branch        Branch         @default(PUSAT) 
 
@@ -170,7 +170,12 @@ model Order {
 
   totalPrice    Int            @default(0)      
   orderedAt     DateTime       @default(now())  
-  paidAt        DateTime?      
+  paidAt        DateTime?
+
+  // --- VOID AUDIT LOG ---
+  voidReason    String?
+  voidedBy      String?
+  voidedAt      DateTime?
 
   stockOverride Boolean        @default(false)  
   overrideNote  String?        

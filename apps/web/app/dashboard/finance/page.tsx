@@ -43,33 +43,94 @@ export default function FinanceReportPage() {
   useEffect(() => { fetchReports(); }, [startDate, endDate]);
 
   const exportToExcel = () => {
-    const dataForExcel = reports.map(r => ({
+    const dataForExcel = reports.map((r) => ({
       "ID Sesi": r.id,
-      "Tanggal": new Date(r.openedAt).toLocaleDateString('id-ID'),
+      "Tanggal Buka": new Date(r.openedAt).toLocaleString("id-ID"),
+      "Tanggal Tutup": r.closedAt
+        ? new Date(r.closedAt).toLocaleString("id-ID")
+        : "-",
       "Cabang": r.branch,
-      "Uang Masuk (Gross)": r.totalSales,
-      "Bagi Hasil Kampus": r.shareKampus,
-      "Pengeluaran Kasir": r.expenses,
-      "Net Kanovi": (r.shareKanovi || 0) - (r.expenses || 0), // FIX LOGIC EXCEL
-      "Selisih Laci": r.difference,
-      "Status": r.status
+      "Modal Awal": r.initialCash || 0,
+      "Penjualan Tunai": getCashSales(r),
+      "Penjualan QRIS": getQrisSales(r),
+      "Omzet Kotor": getGrossSales(r),
+      "Pengeluaran": getExpenses(r),
+      "Kas Seharusnya": getExpectedCash(r),
+      "Kas Fisik": getActualCash(r),
+      "Selisih Laci": getDifference(r),
+      "Bagi Hasil Kampus": r.shareKampus || 0,
+      "Pendapatan Bersih Kanovi": getNetKanovi(r),
+      "Status": r.status,
     }));
+
     const worksheet = XLSX.utils.json_to_sheet(dataForExcel);
     const workbook = XLSX.utils.book_new();
+
     XLSX.utils.book_append_sheet(workbook, worksheet, "Laporan Keuangan");
-    XLSX.writeFile(workbook, `Laporan_Kanovi_${startDate || 'Semua'}_sd_${endDate || 'HariIni'}.xlsx`);
+    XLSX.writeFile(
+      workbook,
+      `Laporan_Kanovi_${startDate || "Semua"}_sd_${endDate || "HariIni"}.xlsx`
+    );
   };
 
   const today = new Date().toDateString();
   const todayReports = reports.filter(r => new Date(r.openedAt).toDateString() === today);
 
   // --- LOGIC FIX: NET KANOVI SEKARANG DIKURANGI PENGELUARAN ---
-  const pendapatanBersihHariIni = todayReports.reduce((sum, r) => sum + ((r.shareKanovi || 0) - (r.expenses || 0)), 0);
-  const pusatHariIni = todayReports.filter(r => r.branch === "PUSAT").reduce((sum, r) => sum + ((r.shareKanovi || 0) - (r.expenses || 0)), 0);
-  const restartHariIniNet = todayReports.filter(r => r.branch === "RESTART").reduce((sum, r) => sum + ((r.shareKanovi || 0) - (r.expenses || 0)), 0);
+  const getNetKanovi = (r: any) => {
+  return Number(r.shareKanovi ?? r.netSales ?? 0);
+  };
 
-  const totalPendapatanBersihAll = reports.reduce((sum, r) => sum + ((r.shareKanovi || 0) - (r.expenses || 0)), 0);
-  const totalSelisihAll = reports.reduce((sum, r) => sum + (r.difference || 0), 0);
+  const getGrossSales = (r: any) => {
+    return Number(r.grossSales ?? r.totalSales ?? 0);
+  };
+
+  const getCashSales = (r: any) => {
+    return Number(r.cashSales ?? 0);
+  };
+
+  const getQrisSales = (r: any) => {
+    return Number(r.qrisSales ?? 0);
+  };
+
+  const getExpenses = (r: any) => {
+    return Number(r.expenses ?? 0);
+  };
+
+  const getExpectedCash = (r: any) => {
+    return Number(r.expectedCash ?? 0);
+  };
+
+  const getActualCash = (r: any) => {
+    return Number(r.actualCash ?? 0);
+  };
+
+  const getDifference = (r: any) => {
+    return Number(r.difference ?? 0);
+  };
+
+  const pendapatanBersihHariIni = todayReports.reduce(
+    (sum, r) => sum + getNetKanovi(r),
+    0
+  );
+
+  const pusatHariIni = todayReports
+    .filter((r) => r.branch === "PUSAT")
+    .reduce((sum, r) => sum + getNetKanovi(r), 0);
+
+  const restartHariIniNet = todayReports
+    .filter((r) => r.branch === "RESTART")
+    .reduce((sum, r) => sum + getNetKanovi(r), 0);
+
+  const totalPendapatanBersihAll = reports.reduce(
+    (sum, r) => sum + getNetKanovi(r),
+    0
+  );
+
+  const totalSelisihAll = reports.reduce(
+    (sum, r) => sum + getDifference(r),
+    0
+  );
 
   const handleUpdate = async (e: any) => {
     e.preventDefault();
@@ -218,21 +279,31 @@ export default function FinanceReportPage() {
             <thead>
               <tr className="bg-gray-50 dark:bg-black/40 text-[10px] uppercase tracking-widest text-gray-400 font-black">
                 <th className="px-6 py-6">Sesi / Cabang</th>
-                <th className="px-6 py-6">Omzet Kotor</th>
-                <th className="px-6 py-6">Bagi Hasil & Net</th>
+                <th className="px-6 py-6">Penjualan</th>
+                <th className="px-6 py-6">Kas Laci</th>
                 <th className="px-6 py-6">Pengeluaran</th>
-                <th className="px-6 py-6 text-center">Selisih Fisik</th>
+                <th className="px-6 py-6">Pendapatan Bersih</th>
+                <th className="px-6 py-6 text-center">Selisih Laci</th>
                 <th className="px-6 py-6 text-right pr-10">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-white/5">
               {reports.map((report) => {
-                const cashSales = report.orders ? report.orders.filter((o:any) => o.paymentMethod === "CASH").reduce((acc:number, curr:any) => acc + curr.totalPrice, 0) : 0;
-                const qrisSales = report.orders ? report.orders.filter((o:any) => o.paymentMethod === "QRIS").reduce((acc:number, curr:any) => acc + curr.totalPrice, 0) : 0;
-                const displayValue = filterMode === "CASH" ? cashSales : filterMode === "QRIS" ? qrisSales : report.totalSales;
-                
-                // LOGIC FIX: Net dikurangi pengeluaran di tabel per baris
-                const netKanovi = (report.shareKanovi || 0) - (report.expenses || 0);
+                const cashSales = getCashSales(report);
+                const qrisSales = getQrisSales(report);
+                const grossSales = getGrossSales(report);
+                const expenses = getExpenses(report);
+                const expectedCash = getExpectedCash(report);
+                const actualCash = getActualCash(report);
+                const difference = getDifference(report);
+                const netKanovi = getNetKanovi(report);
+
+                const displayValue =
+                  filterMode === "CASH"
+                    ? cashSales
+                    : filterMode === "QRIS"
+                    ? qrisSales
+                    : grossSales;
 
                 return (
                   <tr key={report.id} className="text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-all group">
@@ -250,34 +321,118 @@ export default function FinanceReportPage() {
                       </div>
                     </td>
                     
-                    {/* OMZET KOTOR */}
-                    <td className="px-6 py-5 font-black text-kanovi-coffee dark:text-white">
-                      Rp {displayValue.toLocaleString('id-ID')}
-                    </td>
-                    
-                    {/* BAGI HASIL & NET */}
+                    {/* PENJUALAN */}
                     <td className="px-6 py-5">
-                      <div className="text-[9px] font-black space-y-1.5 uppercase tracking-tighter">
-                        {report.branch === "RESTART" && (
-                          <div className="text-orange-500">Kampus (25%): Rp {(report.shareKampus || 0).toLocaleString('id-ID')}</div>
-                        )}
-                        <div className="text-emerald-500 bg-emerald-500/5 px-2 py-0.5 rounded inline-block">
-                          Kanovi: Rp {netKanovi.toLocaleString('id-ID')}
+                      <div className="font-black text-kanovi-coffee dark:text-white">
+                        Rp {displayValue.toLocaleString("id-ID")}
+                      </div>
+
+                      <div className="mt-1 space-y-0.5 text-[10px] font-bold text-gray-400">
+                        <div>
+                          Tunai:{" "}
+                          <span className="text-emerald-600">
+                            Rp {cashSales.toLocaleString("id-ID")}
+                          </span>
+                        </div>
+                        <div>
+                          QRIS:{" "}
+                          <span className="text-blue-600">
+                            Rp {qrisSales.toLocaleString("id-ID")}
+                          </span>
+                        </div>
+                        <div>
+                          Omzet Kotor:{" "}
+                          <span className="text-kanovi-coffee dark:text-white">
+                            Rp {grossSales.toLocaleString("id-ID")}
+                          </span>
                         </div>
                       </div>
                     </td>
-                    
-                    {/* PENGELUARAN */}
+
+                    {/* KAS LACI */}
                     <td className="px-6 py-5">
-                      <div className={`text-[10px] font-bold ${report.expenses > 0 ? 'text-red-500 bg-red-500/10 px-2 py-1 rounded inline-block' : 'text-gray-400'}`}>
-                        {report.expenses > 0 ? `- Rp ${(report.expenses || 0).toLocaleString('id-ID')}` : "-"}
+                      <div className="space-y-1 text-[10px] font-bold">
+                        <div className="text-gray-500">
+                          Modal Awal:{" "}
+                          <span className="text-kanovi-coffee dark:text-white">
+                            Rp {(report.initialCash || 0).toLocaleString("id-ID")}
+                          </span>
+                        </div>
+
+                        <div className="text-gray-500">
+                          Kas Seharusnya:{" "}
+                          <span className="text-blue-600">
+                            Rp {expectedCash.toLocaleString("id-ID")}
+                          </span>
+                        </div>
+
+                        <div className="text-gray-500">
+                          Kas Fisik:{" "}
+                          <span className="text-kanovi-coffee dark:text-white">
+                            Rp {actualCash.toLocaleString("id-ID")}
+                          </span>
+                        </div>
                       </div>
                     </td>
 
-                    {/* SELISIH FISIK */}
+                    {/* PENGELUARAN */}
+                    <td className="px-6 py-5">
+                      {expenses > 0 ? (
+                        <div className="space-y-2">
+                          <div className="text-[10px] font-black text-red-500 bg-red-500/10 px-2 py-1 rounded inline-block">
+                            - Rp {expenses.toLocaleString("id-ID")}
+                          </div>
+
+                          <div className="space-y-1">
+                            {report.expenses_list?.slice(0, 3).map((expense: any) => (
+                              <div
+                                key={expense.id}
+                                className="text-[10px] text-gray-500 font-bold leading-tight"
+                              >
+                                • {expense.description || "Tanpa keterangan"}
+                              </div>
+                            ))}
+
+                            {report.expenses_list?.length > 3 && (
+                              <div className="text-[10px] text-gray-400 italic font-bold">
+                                +{report.expenses_list.length - 3} pengeluaran lain
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-[10px] font-bold text-gray-400">-</div>
+                      )}
+                    </td>
+
+                    {/* PENDAPATAN BERSIH */}
+                    <td className="px-6 py-5">
+                      <div className="text-[10px] font-black space-y-1 uppercase tracking-tighter">
+                        {report.branch === "RESTART" && (
+                          <div className="text-orange-500">
+                            Bagi Kampus: Rp {(report.shareKampus || 0).toLocaleString("id-ID")}
+                          </div>
+                        )}
+
+                        <div className="text-emerald-600 bg-emerald-500/10 px-2 py-1 rounded inline-block">
+                          Bersih Kanovi: Rp {netKanovi.toLocaleString("id-ID")}
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* SELISIH LACI */}
                     <td className="px-6 py-5 text-center">
-                      <div className={`inline-flex px-3 py-1 rounded-lg font-black text-[10px] ${(report.difference || 0) < 0 ? "bg-red-50 text-red-500" : "bg-emerald-50 text-emerald-600"}`}>
-                        {(report.difference || 0) > 0 ? "+" : ""}{(report.difference || 0).toLocaleString('id-ID')}
+                      <div
+                        className={`inline-flex px-3 py-1 rounded-lg font-black text-[10px] ${
+                          difference < 0
+                            ? "bg-red-50 text-red-500"
+                            : difference > 0
+                            ? "bg-blue-50 text-blue-600"
+                            : "bg-emerald-50 text-emerald-600"
+                        }`}
+                      >
+                        {difference > 0 ? "+" : ""}
+                        Rp {difference.toLocaleString("id-ID")}
                       </div>
                     </td>
 
@@ -309,10 +464,67 @@ export default function FinanceReportPage() {
                 </div>
                 <button onClick={() => setViewDetail(null)} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors"><X className="w-6 h-6" /></button>
               </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="bg-white/10 p-4 rounded-2xl border border-white/5"><p className="text-[10px] font-black uppercase opacity-60 mb-1">Total Masuk</p><p className="text-lg font-black">Rp {(viewDetail.totalSales || 0).toLocaleString('id-ID')}</p></div>
-                <div className="bg-white/10 p-4 rounded-2xl border border-white/5"><p className="text-[10px] font-black uppercase opacity-60 mb-1">Dikeluarkan</p><p className="text-lg font-black text-red-300">Rp {(viewDetail.expenses || 0).toLocaleString('id-ID')}</p></div>
-                <div className="bg-white/10 p-4 rounded-2xl border border-white/5"><p className="text-[10px] font-black uppercase opacity-60 mb-1">Selisih</p><p className={`text-lg font-black ${(viewDetail.difference || 0) < 0 ? 'text-red-400' : 'text-emerald-400'}`}>Rp {(viewDetail.difference || 0).toLocaleString('id-ID')}</p></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-white/10 p-4 rounded-2xl border border-white/5">
+                  <p className="text-[10px] font-black uppercase opacity-60 mb-1">
+                    Omzet Kotor
+                  </p>
+                  <p className="text-lg font-black">
+                    Rp {getGrossSales(viewDetail).toLocaleString("id-ID")}
+                  </p>
+                </div>
+
+                <div className="bg-white/10 p-4 rounded-2xl border border-white/5">
+                  <p className="text-[10px] font-black uppercase opacity-60 mb-1">
+                    Pendapatan Bersih
+                  </p>
+                  <p className="text-lg font-black text-emerald-300">
+                    Rp {getNetKanovi(viewDetail).toLocaleString("id-ID")}
+                  </p>
+                </div>
+
+                <div className="bg-white/10 p-4 rounded-2xl border border-white/5">
+                  <p className="text-[10px] font-black uppercase opacity-60 mb-1">
+                    Tunai / QRIS
+                  </p>
+                  <p className="text-sm font-black">
+                    Tunai: Rp {getCashSales(viewDetail).toLocaleString("id-ID")}
+                  </p>
+                  <p className="text-sm font-black">
+                    QRIS: Rp {getQrisSales(viewDetail).toLocaleString("id-ID")}
+                  </p>
+                </div>
+
+                <div className="bg-white/10 p-4 rounded-2xl border border-white/5">
+                  <p className="text-[10px] font-black uppercase opacity-60 mb-1">
+                    Selisih Laci
+                  </p>
+                  <p
+                    className={`text-lg font-black ${
+                      getDifference(viewDetail) < 0 ? "text-red-400" : "text-emerald-400"
+                    }`}
+                  >
+                    Rp {getDifference(viewDetail).toLocaleString("id-ID")}
+                  </p>
+                </div>
+
+                <div className="bg-white/10 p-4 rounded-2xl border border-white/5">
+                  <p className="text-[10px] font-black uppercase opacity-60 mb-1">
+                    Kas Seharusnya
+                  </p>
+                  <p className="text-lg font-black">
+                    Rp {getExpectedCash(viewDetail).toLocaleString("id-ID")}
+                  </p>
+                </div>
+
+                <div className="bg-white/10 p-4 rounded-2xl border border-white/5">
+                  <p className="text-[10px] font-black uppercase opacity-60 mb-1">
+                    Kas Fisik
+                  </p>
+                  <p className="text-lg font-black">
+                    Rp {getActualCash(viewDetail).toLocaleString("id-ID")}
+                  </p>
+                </div>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar">

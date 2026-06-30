@@ -183,10 +183,19 @@ getFinanceReport: (from?: string, to?: string) =>
     body: JSON.stringify(data),
   }),
 
-  voidOrder: (orderId: number, pin: string) =>
+  voidOrder: (
+    orderId: number,
+    pin: string,
+    reason: string,
+    voidedBy?: string
+  ) =>
     fetchApi(`/api/orders/${orderId}/void`, {
       method: "POST",
-      body: JSON.stringify({ pin }),
+      body: JSON.stringify({
+        pin,
+        reason,
+        voidedBy,
+      }),
     }),
 
   directTestPrint: () =>
@@ -205,5 +214,11 @@ getFinanceReport: (from?: string, to?: string) =>
   fetchApi("/api/printer/kitchen", {
     method: "POST",
     body: JSON.stringify(receipt),
+  }),
+
+  printClosingReceipt: (closing: any) =>
+  fetchApi("/api/printer/closing-receipt", {
+    method: "POST",
+    body: JSON.stringify(closing),
   }),
 };
