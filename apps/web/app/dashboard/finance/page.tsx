@@ -74,7 +74,14 @@ export default function FinanceReportPage() {
   };
 
   const today = new Date().toDateString();
-  const todayReports = reports.filter(r => new Date(r.openedAt).toDateString() === today);
+
+  const getReportDate = (r: any) => {
+    return r.closedAt || r.openedAt;
+  };
+
+  const todayReports = reports.filter(
+    (r) => new Date(getReportDate(r)).toDateString() === today
+  );
 
   // --- LOGIC FIX: NET KANOVI SEKARANG DIKURANGI PENGELUARAN ---
   const getNetKanovi = (r: any) => {
@@ -135,18 +142,22 @@ export default function FinanceReportPage() {
   const handleUpdate = async (e: any) => {
     e.preventDefault();
     setIsSubmitting(true);
+
     try {
-      if (newExpense.amount && newExpense.desc) {
-        await api.createExpense({
-          sessionId: editTarget.id, amount: Number(newExpense.amount),
-          description: newExpense.desc, recordedBy: "Owner (Koreksi)"
-        });
-      }
       await api.updateSession(editTarget.id, {
-        actualCash: Number(editTarget.actualCash), initialCash: Number(editTarget.initialCash), note: editTarget.note
+        actualCash: Number(editTarget.actualCash),
+        initialCash: Number(editTarget.initialCash),
+        note: editTarget.note,
       });
-      setEditTarget(null); setNewExpense({ amount: "", desc: "" }); fetchReports();
-    } catch (err) { alert("Gagal update data"); } finally { setIsSubmitting(false); }
+
+      setEditTarget(null);
+      setNewExpense({ amount: "", desc: "" });
+      fetchReports();
+    } catch (err: any) {
+      alert(err?.message || "Gagal update data");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (loading && reports.length === 0) return (
@@ -314,9 +325,19 @@ export default function FinanceReportPage() {
                         </div>
                         <div>
                           <div className="font-black text-kanovi-coffee dark:text-white uppercase text-[10px] flex items-center gap-1.5">
-                            {report.branch} {new Date(report.openedAt).toDateString() === today && <span className="text-[8px] bg-emerald-500 text-white px-1 rounded">HARI INI</span>}
+                            {report.branch}{" "}
+                            {new Date(getReportDate(report)).toDateString() === today && (
+                              <span className="text-[8px] bg-emerald-500 text-white px-1 rounded">
+                                HARI INI
+                              </span>
+                            )}
                           </div>
-                          <div className="text-[10px] text-gray-400 font-bold">{new Date(report.openedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}</div>
+                          <div className="text-[10px] text-gray-400 font-bold">
+                            {new Date(getReportDate(report)).toLocaleDateString("id-ID", {
+                              day: "numeric",
+                              month: "short",
+                            })}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -460,7 +481,13 @@ export default function FinanceReportPage() {
               <div className="flex justify-between items-start mb-6">
                 <div>
                   <h2 className="text-2xl font-black uppercase tracking-tight">Detail Sesi #{viewDetail.id}</h2>
-                  <p className="text-sm opacity-70 font-bold uppercase">{viewDetail.branch} • {new Date(viewDetail.openedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long' })}</p>
+                  <p className="text-sm opacity-70 font-bold uppercase">
+                    {viewDetail.branch} •{" "}
+                    {new Date(getReportDate(viewDetail)).toLocaleDateString("id-ID", {
+                      day: "numeric",
+                      month: "long",
+                    })}
+                </p>
                 </div>
                 <button onClick={() => setViewDetail(null)} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors"><X className="w-6 h-6" /></button>
               </div>
@@ -572,13 +599,13 @@ export default function FinanceReportPage() {
                 <label className="text-[10px] font-black uppercase text-gray-400">Fisik Laci</label>
                 <div className="relative mt-1"><span className="absolute left-0 top-1/2 -translate-y-1/2 font-bold text-gray-400">Rp</span><input type="text" value={formatRibuan(editTarget.actualCash)} onChange={e => setEditTarget({...editTarget, actualCash: e.target.value.replace(/\D/g, "")})} className="w-full pl-7 bg-transparent text-xl font-black outline-none dark:text-white" /></div>
               </div>
-              <div className="p-4 rounded-2xl border-2 border-dashed border-red-200 dark:border-red-900/30 bg-red-50/30 space-y-3">
+              {/* <div className="p-4 rounded-2xl border-2 border-dashed border-red-200 dark:border-red-900/30 bg-red-50/30 space-y-3">
                 <label className="text-[10px] font-black uppercase text-red-500 flex items-center gap-1"><Plus className="w-3 h-3" /> Tambah Pengeluaran?</label>
                 <div className="space-y-2">
                   <input type="text" placeholder="Nominal" value={formatRibuan(newExpense.amount)} onChange={e => setNewExpense({...newExpense, amount: e.target.value.replace(/\D/g, "")})} className="w-full px-4 py-2 bg-white dark:bg-black/40 rounded-xl text-sm font-bold outline-none dark:text-white" />
                   <input type="text" placeholder="Keterangan" value={newExpense.desc} onChange={e => setNewExpense({...newExpense, desc: e.target.value})} className="w-full px-4 py-2 bg-white dark:bg-black/40 rounded-xl text-sm outline-none dark:text-white" />
                 </div>
-              </div>
+              </div> */}
             </div>
             <button type="submit" disabled={isSubmitting} className="w-full py-5 bg-kanovi-wood hover:bg-kanovi-coffee text-white font-black rounded-2xl shadow-xl transition-all active:scale-95 uppercase tracking-widest text-xs">
               {isSubmitting ? "MEMPROSES..." : "Simpan Koreksi"}

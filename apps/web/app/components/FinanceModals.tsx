@@ -15,27 +15,51 @@ const formatRibuan = (value: string) => {
 // 1. MODAL PENGELUARAN (EXPENSE)
 // ==========================================
 export function ExpenseModal({ isOpen, onClose, sessionId }: any) {
-  const [amount, setAmount] = useState(""); // Menyimpan angka murni (string)
-  const [desc, setDesc] = useState("");
-  const [loading, setLoading] = useState(false);
+    const [amount, setAmount] = useState(""); // Menyimpan angka murni (string)
+    const [desc, setDesc] = useState("");
+    const [loading, setLoading] = useState(false);
 
-  if (!isOpen) return null;
+    if (!isOpen) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount || !desc) return alert("Isi jumlah dan keterangan!");
+
+    if (loading) return;
+
+    if (!sessionId) {
+      alert("Sesi kasir tidak ditemukan. Silakan refresh halaman.");
+      return;
+    }
+
+    if (!amount || !desc) {
+      alert("Isi jumlah dan keterangan!");
+      return;
+    }
+
     setLoading(true);
+
     try {
       await api.createExpense({
         sessionId,
-        amount: Number(amount), // Konversi ke number saat kirim ke API
+        amount: Number(amount),
         description: desc,
-        recordedBy: "Kasir Bertugas"
+        recordedBy: "Kasir Bertugas",
       });
+
       alert("Pengeluaran tercatat!");
-      setAmount(""); setDesc(""); onClose();
-    } catch (err: any) { alert(err.message); } 
-    finally { setLoading(false); }
+      setAmount("");
+      setDesc("");
+      onClose();
+    } catch (err: any) {
+      const message =
+        err?.payload?.message ||
+        err?.message ||
+        "Gagal menyimpan pengeluaran.";
+
+      alert(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -82,22 +106,63 @@ export function ClosingModal({ isOpen, onClose, sessionId, onClosingSuccess }: a
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!actualCash || !closedBy) return alert("Isi nama penanggung jawab dan total uang fisik!");
-    setLoading(true);
-    try {
-      await api.closeSession({
-        sessionId,
-        closedBy,
-        actualCash: Number(actualCash),
-        note
-      });
-      alert("Sesi kasir berhasil ditutup!");
-      setActualCash(""); setClosedBy(""); setNote("");
+  e.preventDefault();
+
+  if (loading) return;
+
+  if (!sessionId) {
+    alert("Sesi kasir tidak ditemukan. Silakan refresh halaman.");
+    return;
+  }
+
+  if (!actualCash || !closedBy) {
+    alert("Isi nama penanggung jawab dan total uang fisik!");
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    const result = await api.closeSession({
+      sessionId,
+      closedBy,
+      actualCash: Number(actualCash),
+      note,
+    });
+
+    alert(result?.message || "Sesi kasir berhasil ditutup!");
+
+    setActualCash("");
+    setClosedBy("");
+    setNote("");
+
+    onClosingSuccess();
+  } catch (err: any) {
+    const message =
+      err?.payload?.message ||
+      err?.message ||
+      "Gagal menutup sesi kasir.";
+
+    if (
+      message.toLowerCase().includes("sudah ditutup") ||
+      err?.status === 409 ||
+      err?.code === 409
+    ) {
+      alert("Sesi kasir sudah ditutup. Anda akan diarahkan ke halaman login.");
+
+      setActualCash("");
+      setClosedBy("");
+      setNote("");
+
       onClosingSuccess();
-    } catch (err: any) { alert(err.message); } 
-    finally { setLoading(false); }
-  };
+      return;
+    }
+
+    alert(message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="fixed inset-0 z-110 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -138,7 +203,13 @@ export function ClosingModal({ isOpen, onClose, sessionId, onClosingSuccess }: a
             <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
             <p className="text-[10px] text-amber-800 dark:text-amber-200 italic leading-tight">Sesi akan langsung terkunci setelah ditutup. Pastikan semua orderan sudah lunas.</p>
           </div>
-          <button type="submit" disabled={loading} className="w-full py-4 bg-kanovi-coffee hover:bg-black text-white font-bold rounded-2xl transition-all shadow-lg">{loading ? "Memproses..." : "TUTUP KASIR & SIMPAN"}</button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-4 bg-kanovi-coffee hover:bg-black text-white font-bold rounded-2xl transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? "Memproses..." : "TUTUP KASIR & SIMPAN"}
+          </button>
           <button type="button" onClick={onClose} className="w-full py-2 text-gray-400 text-sm font-semibold">Batal</button>
         </form>
       </div>

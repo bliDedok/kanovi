@@ -17,6 +17,7 @@ export default function POSPage() {
 
   const [activeSession, setActiveSession] = useState<any>(null);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -47,24 +48,44 @@ export default function POSPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [menus, setMenus] = useState<Menu[]>([]);
 
-  const checkSession = async (branchName: string) => {
+  const checkSession = async (branchName?: string) => {
     try {
       setIsCheckingSession(true);
-      const session = await api.getActiveSession(branchName);
-      setActiveSession(session);
-    } catch (err) { 
-      console.error("Gagal cek sesi", err); 
-    } finally { 
-      setIsCheckingSession(false); 
+
+      const selectedBranch =
+        branchName || localStorage.getItem("kanovi_branch") || "PUSAT";
+
+      const session = await api.getActiveSession(selectedBranch);
+
+      if (session) {
+        setActiveSession(session);
+        localStorage.setItem("kanovi_branch", session.branch);
+      } else {
+        setActiveSession(null);
+      }
+    } catch (err) {
+      console.error("Gagal cek sesi", err);
+      setActiveSession(null);
+    } finally {
+      setIsCheckingSession(false);
     }
   };
 
 
   useEffect(() => {
-    const savedBranch = localStorage.getItem("kanovi_branch");
-    if (savedBranch) { checkSession(savedBranch); } 
-    else { setIsCheckingSession(false); }
-    
+    const savedUser = localStorage.getItem("kanovi_user") || localStorage.getItem("user");
+
+    if (savedUser) {
+      try {
+        setCurrentUser(JSON.parse(savedUser));
+      } catch (error) {
+        console.error("Gagal membaca user login:", error);
+      }
+    }
+
+    const savedBranch = localStorage.getItem("kanovi_branch") || "PUSAT";
+    checkSession(savedBranch);
+
     const loadMenus = async () => {
       try { const data = await api.getMenus(); setMenus(Array.isArray(data) ? data : []); } 
       catch (error) { console.error(error); }
@@ -291,7 +312,15 @@ export default function POSPage() {
     <div className="flex h-screen bg-kanovi-bone dark:bg-kanovi-dark transition-colors duration-300 font-sans overflow-hidden relative">
       
       {!activeSession && !isCheckingSession && (
-        <OpeningSessionModal onOpenSuccess={(session) => { setActiveSession(session); localStorage.setItem("kanovi_branch", session.branch); }} />
+        <OpeningSessionModal
+          currentUser={currentUser}
+          onOpenSuccess={(session) => {
+            const normalizedSession = session?.session || session;
+
+            setActiveSession(normalizedSession);
+            localStorage.setItem("kanovi_branch", normalizedSession.branch);
+          }}
+        />
       )}
 
       {isCheckingSession && (
@@ -463,7 +492,25 @@ export default function POSPage() {
         }}
       />      
       <ExpenseModal isOpen={isExpenseOpen} onClose={() => setIsExpenseOpen(false)} sessionId={activeSession?.id} />
-      <ClosingModal isOpen={isClosingOpen} onClose={() => setIsClosingOpen(false)} sessionId={activeSession?.id} onClosingSuccess={() => { setActiveSession(null); setIsClosingOpen(false); localStorage.removeItem("kanovi_branch"); document.cookie = "kanovi_token=; path=/; max-age=0;"; router.push("/login"); }} />
+      <ClosingModal
+        isOpen={isClosingOpen}
+        onClose={() => setIsClosingOpen(false)}
+        sessionId={activeSession?.id}
+        onClosingSuccess={() => {
+          setActiveSession(null);
+          setIsClosingOpen(false);
+
+          localStorage.removeItem("kanovi_cart");
+          localStorage.removeItem("kanovi_hold_bills");
+          localStorage.removeItem("pending_receipt");
+          localStorage.removeItem("kanovi_user");
+
+          document.cookie = "kanovi_token=; path=/; max-age=0;";
+          document.cookie = "kanovi_role=; path=/; max-age=0;";
+
+          router.replace("/login");
+        }}
+      />
       
       <HoldBillModal 
         isOpen={isHoldModalOpen} 
