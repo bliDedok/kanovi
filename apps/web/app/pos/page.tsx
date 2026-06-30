@@ -227,6 +227,12 @@ export default function POSPage() {
         posName: "POS 1",
       });
 
+      try {
+        await api.printKitchenReceipt(receiptData);
+      } catch (error) {
+        console.error("Gagal print struk dapur", error);
+      }
+
       localStorage.setItem(
       "pending_receipt",
       JSON.stringify(receiptData)
