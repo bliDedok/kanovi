@@ -215,4 +215,10 @@ getFinanceReport: (from?: string, to?: string) =>
     method: "POST",
     body: JSON.stringify(receipt),
   }),
+
+  printClosingReceipt: (closing: any) =>
+  fetchApi("/api/printer/closing-receipt", {
+    method: "POST",
+    body: JSON.stringify(closing),
+  }),
 };

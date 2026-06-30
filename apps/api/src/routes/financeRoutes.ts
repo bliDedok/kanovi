@@ -20,7 +20,7 @@ export default async function financeRoutes(fastify: FastifyInstance) {
 
   fastify.post(
     "/sessions/close",
-    { preHandler: ownerOnly },
+    { preHandler: cashierOrOwner },
     financeController.closeSession
   );
 
@@ -32,7 +32,7 @@ export default async function financeRoutes(fastify: FastifyInstance) {
 
   fastify.post(
     "/expenses",
-    { preHandler: ownerOnly },
+    { preHandler: cashierOrOwner },
     financeController.createExpense
   );
 

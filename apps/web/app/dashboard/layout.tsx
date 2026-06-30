@@ -141,7 +141,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             href="/dashboard/finance"
             onClick={() => window.innerWidth < 768 && setIsSidebarOpen(false)}
             className={`flex items-center gap-4 p-3 rounded-lg transition-colors ${
-              pathname.includes("/dashboard/inventory")
+              pathname.includes("/dashboard/finance")
                 ? "bg-kanovi-cream/50 dark:bg-kanovi-wood/20 text-kanovi-wood dark:text-kanovi-wood font-semibold"
                 : "hover:bg-kanovi-cream/30 dark:hover:bg-white/5 text-gray-600 dark:text-gray-300"
             }`}
