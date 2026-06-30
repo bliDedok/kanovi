@@ -58,6 +58,9 @@ export type Order = {
   paymentMethod?: PaymentMethod | null;
   totalPrice: number;
   orderedAt: string;
+  voidReason?: string | null;
+  voidedBy?: string | null;
+  voidedAt?: string | null;
   details: OrderDetail[];
 };
 

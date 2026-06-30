@@ -97,12 +97,26 @@ export default function HistoryPage() {
 
     if (!pin) return;
 
+    const reason = prompt(
+      "📝 Alasan VOID\nTuliskan alasan pembatalan transaksi ini:"
+    );
+
+    if (!reason || reason.trim().length < 3) {
+      alert("Alasan VOID wajib diisi minimal 3 karakter.");
+      return;
+    }
+
+    const voidedBy =
+      localStorage.getItem("kanovi_cashier_name") ||
+      localStorage.getItem("kanovi_user_name") ||
+      "Manager";
+
     try {
-      await api.voidOrder(orderId, pin);
-      alert("✅ Transaksi berhasil di-VOID. Stok bahan baku telah dikembalikan.");
+      await api.voidOrder(orderId, pin, reason.trim(), voidedBy);
+      alert("✅ Transaksi berhasil di-VOID. Audit log telah disimpan.");
       fetchHistory();
     } catch (err: any) {
-      alert("❌ Gagal VOID: " + err.message);
+      alert("❌ Gagal VOID: " + (err?.message || "Terjadi kesalahan."));
     }
   };
 

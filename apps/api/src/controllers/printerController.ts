@@ -240,7 +240,7 @@ const buildKitchenReceiptText = (receipt: ReceiptPayload) => {
     const itemName = item.name || "Menu";
 
 
-    // Nomor antrean
+
     output.push(TEXT_BOLD_ON);
     output.push(TEXT_SIZE_DOUBLE);
     output.push(centerText(receipt.queueNumber || "-", Math.floor(WIDTH / 2)));
@@ -256,7 +256,7 @@ const buildKitchenReceiptText = (receipt: ReceiptPayload) => {
     output.push(line());
     output.push("");
 
-    // Item dapur
+   
     output.push(TEXT_BOLD_ON);
     wrapText(`${qty} x ${itemName}`, WIDTH).forEach((text) => {
       output.push(padLine(text));
@@ -266,14 +266,14 @@ const buildKitchenReceiptText = (receipt: ReceiptPayload) => {
     output.push("");
     output.push(line());
 
-    // Feed agar ticket keluar cukup jauh sebelum disobek
+   
     output.push("");
     output.push("");
     output.push("");
     output.push("");
     output.push("");
 
-    // Kalau ada item berikutnya, kasih jarak tambahan
+   
     if (index < items.length - 1) {
       output.push("");
       output.push("");
