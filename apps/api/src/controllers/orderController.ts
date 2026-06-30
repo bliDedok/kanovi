@@ -507,6 +507,62 @@ export const voidOrder = async (req: FastifyRequest, reply: FastifyReply) => {
         },
       });
 
+      if (lockedOrder.sessionId) {
+      const session = await tx.cashSession.findUnique({
+        where: { id: lockedOrder.sessionId },
+      });
+
+      if (session && session.status === "CLOSED") {
+        const paidOrders = await tx.order.findMany({
+          where: {
+            sessionId: lockedOrder.sessionId,
+            paymentStatus: "PAID",
+          },
+          select: {
+            paymentMethod: true,
+            totalPrice: true,
+          },
+        });
+
+        const cashSales = paidOrders
+          .filter((order) => order.paymentMethod === "CASH")
+          .reduce((sum, order) => sum + order.totalPrice, 0);
+
+        const qrisSales = paidOrders
+          .filter((order) => order.paymentMethod === "QRIS")
+          .reduce((sum, order) => sum + order.totalPrice, 0);
+
+        const expenses = await tx.expense.findMany({
+          where: {
+            sessionId: lockedOrder.sessionId,
+          },
+          select: {
+            amount: true,
+          },
+        });
+
+        const totalExpenses = expenses.reduce(
+          (sum, expense) => sum + expense.amount,
+          0
+        );
+
+        const expectedCash =
+          Number(session.initialCash || 0) + cashSales - totalExpenses;
+
+        const actualCash = Number(session.actualCash || 0);
+        const difference = actualCash - expectedCash;
+
+        await tx.cashSession.update({
+          where: { id: lockedOrder.sessionId },
+          data: {
+            expectedCash,
+            difference,
+          },
+        });
+      }
+    }
+
+
       return { kind: "SUCCESS" as const, order: voidedOrder };
     });
 

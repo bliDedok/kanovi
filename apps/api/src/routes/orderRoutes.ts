@@ -1,5 +1,5 @@
 import { FastifyInstance } from "fastify";
-import { verifyToken, allowRoles } from "../middleware/authMiddleware";
+import { verifyToken } from "../middleware/authMiddleware";
 import {
   createOrder,
   checkOrderStock,
@@ -14,7 +14,7 @@ export default async function orderRoutes(app: FastifyInstance) {
 
   app.post(
     "/:id/void",
-    { preHandler: [verifyToken, allowRoles(["OWNER", "MANAGER"])] },
+    { preHandler: [verifyToken] },
     voidOrder
   );
 }

@@ -211,7 +211,7 @@ getFinanceReport: (from?: string, to?: string) =>
     }),
 
   printKitchenReceipt: (receipt: ReceiptData) =>
-  fetchApi("/api/printer/kitchen", {
+  fetchApi("/api/printer/kitchen-receipt", {
     method: "POST",
     body: JSON.stringify(receipt),
   }),

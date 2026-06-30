@@ -11,7 +11,13 @@ const formatRibuan = (value: string) => {
   return parseInt(angka).toLocaleString("id-ID");
 };
 
-export default function OpeningSessionModal({ onOpenSuccess }: { onOpenSuccess: (session: any) => void }) {
+export default function OpeningSessionModal({
+    currentUser,
+    onOpenSuccess,
+  }: {
+    currentUser?: any;
+    onOpenSuccess: (session: any) => void;
+  }) {
   // Ambil cabang terakhir yang disimpan di tablet ini, default PUSAT
   const [branch, setBranch] = useState(() => {
     if (typeof window !== "undefined") {
@@ -25,21 +31,17 @@ export default function OpeningSessionModal({ onOpenSuccess }: { onOpenSuccess: 
   const [loading, setLoading] = useState(false);
   const [isFetchingUser, setIsFetchingUser] = useState(true);
 
-  // Otomatis deteksi siapa yang sedang login
   useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        const user = await api.getProfile();
-        setOpenedBy(user.name);
-      } catch (err) {
-        console.error("Gagal mengambil profil user");
-        setOpenedBy("Kasir Bertugas"); // Fallback jika gagal
-      } finally {
-        setIsFetchingUser(false);
-      }
-    };
-    fetchUserData();
-  }, []);
+    const userName =
+      currentUser?.name ||
+      currentUser?.username ||
+      currentUser?.fullName ||
+      currentUser?.displayName ||
+      "Kasir Bertugas";
+
+    setOpenedBy(userName);
+    setIsFetchingUser(false);
+  }, [currentUser]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

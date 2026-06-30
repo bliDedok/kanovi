@@ -5,10 +5,18 @@ export const financeController = {
   // 1. CEK SESI AKTIF
   getActiveSession: async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const { branch } = request.query as { branch: string };
+      const { branch } = request.query as { branch?: string };
+
       const session = await prisma.cashSession.findFirst({
-        where: { branch: branch as any, status: "OPEN" },
+        where: {
+          ...(branch ? { branch: branch as any } : {}),
+          status: "OPEN",
+        },
+        orderBy: {
+          openedAt: "desc",
+        },
       });
+
       return reply.send(session);
     } catch (error: any) {
       return reply.status(500).send({ error: error.message });
@@ -19,10 +27,42 @@ export const financeController = {
   openSession: async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const { branch, openedBy, initialCash } = request.body as any;
-      const session = await prisma.cashSession.create({
-        data: { branch, openedBy, initialCash: Number(initialCash), status: "OPEN" },
+
+      const selectedBranch = branch || "PUSAT";
+
+      const existingOpenSession = await prisma.cashSession.findFirst({
+        where: {
+          branch: selectedBranch as any,
+          status: "OPEN",
+        },
+        orderBy: {
+          openedAt: "desc",
+        },
       });
-      return reply.status(201).send(session);
+
+      if (existingOpenSession) {
+        return reply.send({
+          success: true,
+          alreadyOpen: true,
+          message: "Sesi kasir masih aktif.",
+          session: existingOpenSession,
+        });
+      }
+
+      const session = await prisma.cashSession.create({
+        data: {
+          branch: selectedBranch,
+          openedBy,
+          initialCash: Number(initialCash || 0),
+          status: "OPEN",
+        },
+      });
+
+      return reply.status(201).send({
+        success: true,
+        alreadyOpen: false,
+        session,
+      });
     } catch (error: any) {
       return reply.status(500).send({ error: error.message });
     }
@@ -32,15 +72,39 @@ export const financeController = {
   createExpense: async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const { sessionId, amount, description, recordedBy } = request.body as any;
-      const expense = await prisma.expense.create({
-        data: { 
-          sessionId: Number(sessionId), 
-          branch: "PUSAT", // Default, nanti diupdate otomatis di DB push
-          amount: Number(amount), 
-          description, 
-          recordedBy 
+
+      const session = await prisma.cashSession.findUnique({
+        where: { id: Number(sessionId) },
+        select: {
+          branch: true,
+          status: true,
         },
       });
+
+      if (!session) {
+        return reply.code(404).send({
+          success: false,
+          message: "Sesi kasir tidak ditemukan.",
+        });
+      }
+
+      if (session.status !== "OPEN") {
+        return reply.code(409).send({
+          success: false,
+          message: "Sesi kasir sudah ditutup.",
+        });
+      }
+
+      const expense = await prisma.expense.create({
+        data: {
+          sessionId: Number(sessionId),
+          branch: session.branch,
+          amount: Number(amount),
+          description,
+          recordedBy,
+        },
+      });
+
       return reply.status(201).send(expense);
     } catch (error: any) {
       return reply.status(500).send({ error: error.message });
@@ -55,8 +119,8 @@ export const financeController = {
       await prisma.cashSession.update({
         where: { id: Number(id) },
         data: { 
-          actualCash: actualCash ? Number(actualCash) : undefined,
-          initialCash: initialCash ? Number(initialCash) : undefined,
+          actualCash: actualCash !== undefined ? Number(actualCash) : undefined,
+          initialCash: initialCash !== undefined ? Number(initialCash) : undefined,
           note 
         },
       });
@@ -96,12 +160,10 @@ export const financeController = {
         };
       }
 
-      const sessionOrders = await tx.order.findMany({
+      const paidOrders = await tx.order.findMany({
         where: {
           sessionId: Number(sessionId),
-          paymentStatus: {
-            in: ["PAID", "VOID"],
-          },
+          paymentStatus: "PAID",
         },
         select: {
           id: true,
@@ -111,13 +173,16 @@ export const financeController = {
         },
       });
 
-      const paidOrders = sessionOrders.filter(
-        (order) => order.paymentStatus === "PAID"
-      );
+      const voidOrders = await tx.order.findMany({
+        where: {
+          sessionId: Number(sessionId),
+          paymentStatus: "VOID",
+        },
+        select: {
+          id: true,
+        },
+      });
 
-      const voidOrders = sessionOrders.filter(
-        (order) => order.paymentStatus === "VOID"
-      );
 
       const cashSales = paidOrders
         .filter((order) => order.paymentMethod === "CASH")
@@ -185,8 +250,9 @@ export const financeController = {
     }
 
     if (result.kind === "ALREADY_CLOSED") {
-      return reply.code(409).send({
-        success: false,
+      return reply.send({
+        success: true,
+        alreadyClosed: true,
         message: "Sesi kasir sudah ditutup.",
         session: result.session,
       });
@@ -213,25 +279,40 @@ export const financeController = {
   try {
     const { from, to } = request.query as { from?: string; to?: string };
     
-    // Logic Filter Tanggal
     const dateFilter: any = {};
+
     if (from || to) {
-      dateFilter.openedAt = {};
-      if (from) dateFilter.openedAt.gte = new Date(from);
+      dateFilter.closedAt = {};
+
+      if (from) {
+        const startOfDay = new Date(from);
+        startOfDay.setHours(0, 0, 0, 0);
+        dateFilter.closedAt.gte = startOfDay;
+      }
+
       if (to) {
         const endOfDay = new Date(to);
         endOfDay.setHours(23, 59, 59, 999);
-        dateFilter.openedAt.lte = endOfDay;
+        dateFilter.closedAt.lte = endOfDay;
       }
     }
 
     const sessions = await prisma.cashSession.findMany({
-      where: dateFilter,
-      orderBy: { openedAt: "desc" },
+      where: {
+        ...dateFilter,
+        status: "CLOSED",
+      },
+      orderBy: { closedAt: "desc" },
       include: {
         orders: {
           where: { paymentStatus: "PAID" },
-          include: { details: { include: { menu: true } } }
+          include: {
+            details: {
+              include: {
+                menu: true,
+              },
+            },
+          },
         },
         expenses: true,
       },
