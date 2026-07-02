@@ -16,6 +16,7 @@ type Menu = {
   id: number;
   name: string;
   price: number;
+  isAvailable: boolean;
   categoryId?: number | null;
   category?: Category | null;
 };
@@ -54,7 +55,9 @@ export default function MenuListPage() {
   const [editingMenu, setEditingMenu] = useState<Menu | null>(null);
   const [editName, setEditName] = useState("");
   const [editPrice, setEditPrice] = useState("");
+  const [editIsAvailable, setEditIsAvailable] = useState(true);
   const [isEditSaving, setIsEditSaving] = useState(false);
+  const [availabilityUpdatingId, setAvailabilityUpdatingId] = useState<number | null>(null);
   const getToken = () => document.cookie.split("; ").find((row) => row.startsWith("kanovi_token="))?.split("=")[1];
 
     const apiRequest = async (path: string, options: RequestInit = {}) => {
@@ -272,15 +275,18 @@ export default function MenuListPage() {
     setEditName(menu.name);
     setEditPrice(String(menu.price));
     setEditCategoryId(menu.categoryId ? String(menu.categoryId) : "");
+    setEditIsAvailable(menu.isAvailable);
     setIsEditModalOpen(true);
   };
 
-    const closeEditModal = () => {
+  const closeEditModal = () => {
   setIsEditModalOpen(false);
   setEditingMenu(null);
   setEditName("");
   setEditPrice("");
   setEditCategoryId("");
+  setEditIsAvailable(true);
+
 };
 
 
@@ -305,14 +311,14 @@ export default function MenuListPage() {
 
     try {
       await apiRequest(`/api/menus/${editingMenu.id}`, {
-  method: "PUT",
+  method: "PATCH",
   body: JSON.stringify({
     name,
     price,
     categoryId: editCategoryId ? Number(editCategoryId) : null,
+    isAvailable: editIsAvailable,
   }),
 });
-
       toast.success("Menu berhasil diupdate", { id: toastId });
       closeEditModal();
       fetchMenus();
@@ -344,6 +350,47 @@ const filteredMenus = menus.filter((menu) => {
 
   return matchSearch && matchCategory;
 });
+
+const toggleMenuAvailability = async (menu: Menu) => {
+  const nextStatus = !menu.isAvailable;
+
+  setAvailabilityUpdatingId(menu.id);
+
+  const toastId = toast.loading(
+    nextStatus
+      ? "Mengubah menu menjadi tersedia..."
+      : "Mengubah menu menjadi tidak tersedia..."
+  );
+
+  try {
+    await apiRequest(`/api/menus/${menu.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        isAvailable: nextStatus,
+      }),
+    });
+
+    toast.success(
+      nextStatus
+        ? `${menu.name} sekarang tersedia.`
+        : `${menu.name} sekarang tidak tersedia.`,
+      { id: toastId }
+    );
+
+    await fetchMenus();
+  } catch (error) {
+    console.error("toggleMenuAvailability error:", error);
+
+    toast.error(
+      error instanceof Error
+        ? error.message
+        : "Gagal mengubah status ketersediaan menu.",
+      { id: toastId }
+    );
+  } finally {
+    setAvailabilityUpdatingId(null);
+  }
+};
 
   return (
     <div className="max-w-5xl mx-auto w-full relative">
@@ -402,19 +449,47 @@ const filteredMenus = menus.filter((menu) => {
                 <th className="p-3 md:p-4 font-bold">Nama Menu</th>
                 <th className="p-3 md:p-4 font-bold">Harga</th>
                 <th className="p-3 md:p-4 font-bold">Kategori</th>
-                <th className="p-3 md:p-4 font-bold text-center">Aksi</th>
+                <th className="p-3 md:p-4 font-bold">Status</th>
+                <th className="p-3 md:p-4 font-bold text-center">Aksi</th>  
               </tr>
             </thead>
             <tbody className="divide-y divide-kanovi-cream/40 dark:divide-white/5 text-sm md:text-base">
-              {filteredMenus.map((menu: any) => (
+              {filteredMenus.map((menu) => (
                 // HOVER TABEL AMAN DARI FLASHBANG
                 <tr key={menu.id} className="hover:bg-kanovi-cream/20 dark:hover:bg-white/5 transition-colors">
                   <td className="p-3 md:p-4 text-kanovi-coffee/60 dark:text-kanovi-cream/50">#{menu.id}</td>
                   <td className="p-3 md:p-4 font-semibold text-kanovi-coffee dark:text-kanovi-bone">{menu.name}</td>
                   <td className="p-3 md:p-4 text-kanovi-wood dark:text-kanovi-cream">Rp {menu.price.toLocaleString("id-ID")}</td>
                   <td className="p-3 md:p-4 text-kanovi-coffee dark:text-kanovi-bone">{menu.category?.name ?? "-"}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={
+                        menu.isAvailable
+                          ? "inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
+                          : "inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700 dark:bg-red-500/20 dark:text-red-300"
+                      }
+                    >
+                      {menu.isAvailable ? "Tersedia" : "Tidak Tersedia"}
+                    </span>
+                  </td>
                   <td className="p-3 md:p-4 text-center">
                     <div className="flex justify-center items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleMenuAvailability(menu)}
+                        disabled={availabilityUpdatingId === menu.id}
+                        className={
+                          menu.isAvailable
+                            ? "px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-500/20 dark:hover:bg-red-500/30 dark:text-red-300 text-xs md:text-sm font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            : "px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 dark:bg-emerald-500/20 dark:hover:bg-emerald-500/30 dark:text-emerald-300 text-xs md:text-sm font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        }
+                      >
+                        {availabilityUpdatingId === menu.id
+                          ? "Menyimpan..."
+                          : menu.isAvailable
+                            ? "Jadikan Tidak Tersedia"
+                            : "Jadikan Tersedia"}
+                      </button>
                       <button
                         onClick={() => openEditModal(menu)}
                         className="px-3 py-1.5 bg-kanovi-cream/40 hover:bg-kanovi-cream/70 dark:bg-white/5 dark:hover:bg-white/10 text-kanovi-coffee dark:text-kanovi-cream text-xs md:text-sm font-medium rounded-md transition-colors"
@@ -527,6 +602,26 @@ const filteredMenus = menus.filter((menu) => {
                 placeholder="0"
                 className="w-full px-4 py-3 bg-kanovi-paper dark:bg-black/20 border border-kanovi-cream dark:border-white/10 rounded-xl text-kanovi-coffee dark:text-kanovi-bone"
               />
+
+            <div>
+                <label className="block text-sm font-semibold mb-2 text-kanovi-coffee dark:text-kanovi-bone">
+                  Status Ketersediaan
+                </label>
+
+                <select
+                  value={editIsAvailable ? "available" : "unavailable"}
+                  onChange={(e) => setEditIsAvailable(e.target.value === "available")}
+                  className="w-full px-4 py-3 bg-kanovi-paper dark:bg-black/20 border border-kanovi-cream dark:border-white/10 rounded-xl text-kanovi-coffee dark:text-kanovi-bone"
+                >
+                  <option value="available">Tersedia</option>
+                  <option value="unavailable">Tidak Tersedia</option>
+                </select>
+
+                <p className="mt-2 text-xs text-kanovi-coffee/60 dark:text-kanovi-cream/50">
+                  Menu yang tidak tersedia tetap muncul di dashboard, tetapi tidak bisa dipilih di POS.
+                </p>
+            </div>
+
             </div>
           </div>
 

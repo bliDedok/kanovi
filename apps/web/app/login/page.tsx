@@ -67,7 +67,27 @@ export default function LoginPage() {
       }
       document.cookie = `kanovi_token=${data.token}; path=/; max-age=86400;`;
       document.cookie = `kanovi_role=${data.role}; path=/; max-age=86400;`;
-      router.push(data.role === 'OWNER' ? "/dashboard" : "/pos");
+
+      localStorage.setItem(
+        "kanovi_user",
+        JSON.stringify({
+          username: selectedUser?.username,
+          name: selectedUser?.name,
+          role: data.role,
+        })
+      );
+
+      localStorage.setItem(
+        "kanovi_user",
+        JSON.stringify({
+          username: selectedUser?.username || username,
+          name: selectedUser?.name || data.name || username,
+          role: data.role,
+          icon: selectedUser?.icon,
+        })
+      );
+
+      router.push(data.role === "OWNER" ? "/dashboard" : "/pos");
       router.refresh();
     } catch {
       setErrorMsg("Server error.");

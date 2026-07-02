@@ -1,47 +1,55 @@
-import { FastifyRequest, FastifyReply } from 'fastify'; 
-import { PrismaClient } from '@prisma/client';
-import bcrypt from "bcryptjs";
-import jwt from 'jsonwebtoken';
+import { FastifyRequest, FastifyReply } from "fastify";
+import { authService } from "../services/authService";
 
-const prisma = new PrismaClient();
-
-export const loginUser = async (req: FastifyRequest, reply: FastifyReply) => {
-  // Ambil data dari body (di-cast ke any sementara karena tipe body bawaan Fastify adalah unknown)
-  const { username, password } = req.body as any;
-
-  if (!username) {
-    return reply.code(400).send({ message: "Username tidak boleh kosong" });
-  }
-  if (!password) {
-    return reply.code(400).send({ message: "Password tidak boleh kosong" });
-  }
+export const loginUser = async (
+  req: FastifyRequest,
+  reply: FastifyReply
+) => {
+  const { username, password } = req.body as {
+    username?: string;
+    password?: string;
+  };
 
   try {
-    const user = await prisma.user.findUnique({ where: { username } });
-    
-    if (!user) {
-      return reply.code(401).send({ message: "Username atau password salah" });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return reply.code(401).send({ message: "Username atau password salah" });
-    }
-
-    const token = jwt.sign(
-      { userId: user.id, role: user.role }, 
-      process.env.JWT_SECRET || 'rahasia_negara', 
-      { expiresIn: '1d' }
-    );
-
-    return reply.code(200).send({ 
-      message: "Login berhasil",
-      token, 
-      role: user.role 
+    const result = await authService.login({
+      username: username || "",
+      password: password || "",
     });
-    
+
+    if (result.kind === "USERNAME_REQUIRED") {
+      return reply.code(400).send({
+        message: "Username tidak boleh kosong",
+      });
+    }
+
+    if (result.kind === "PASSWORD_REQUIRED") {
+      return reply.code(400).send({
+        message: "Password tidak boleh kosong",
+      });
+    }
+
+    if (result.kind === "INVALID_CREDENTIALS") {
+      return reply.code(401).send({
+        message: "Username atau password salah",
+      });
+    }
+
+    if (result.kind === "JWT_SECRET_MISSING") {
+      return reply.code(500).send({
+        message: "JWT_SECRET belum diatur di server.",
+      });
+    }
+
+    return reply.code(200).send({
+      message: "Login berhasil",
+      token: result.token,
+      role: result.role,
+    });
   } catch (error) {
     console.error(error);
-    return reply.code(500).send({ message: "Terjadi kesalahan pada server" });
+
+    return reply.code(500).send({
+      message: "Terjadi kesalahan pada server",
+    });
   }
 };
