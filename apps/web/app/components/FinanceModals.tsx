@@ -130,7 +130,90 @@ export function ClosingModal({ isOpen, onClose, sessionId, onClosingSuccess }: a
       note,
     });
 
-    alert(result?.message || "Sesi kasir berhasil ditutup!");
+    console.log("CLOSING RESULT:", result);
+
+    const closingData = result?.session || result?.data || result?.closing || result;
+    const closingSummary = result?.summary || closingData?.summary || {};
+
+    console.log("CLOSING DATA:", closingData);
+    console.log("CLOSING SUMMARY:", closingSummary);
+
+    try {
+      const closingPrintPayload = {
+        sessionId: closingData?.id || closingData?.sessionId || sessionId,
+
+        openedBy: closingData?.openedBy,
+        closedBy: closingData?.closedBy || closedBy,
+        branch: closingData?.branch || "PUSAT",
+        openedAt: closingData?.openedAt,
+        closedAt: closingData?.closedAt,
+
+        openingCash:
+          closingSummary?.openingCash ??
+          closingData?.openingCash ??
+          closingData?.initialCash ??
+          0,
+
+        cashSales:
+          closingSummary?.cashSales ??
+          closingData?.cashSales ??
+          0,
+
+        qrisSales:
+          closingSummary?.qrisSales ??
+          closingData?.qrisSales ??
+          0,
+
+        expenses:
+          closingSummary?.expenses ??
+          closingData?.expenses ??
+          0,
+
+        expectedCash:
+          closingSummary?.expectedCash ??
+          closingData?.expectedCash ??
+          0,
+
+        actualCash:
+          closingSummary?.actualCash ??
+          closingData?.actualCash ??
+          Number(actualCash),
+
+        difference:
+          closingSummary?.difference ??
+          closingData?.difference ??
+          0,
+
+        totalOrders:
+          closingSummary?.totalOrders ??
+          closingData?.totalOrders ??
+          0,
+
+        totalVoidOrders:
+          closingSummary?.totalVoidOrders ??
+          closingData?.totalVoidOrders ??
+          0,
+
+        grossSales:
+          closingSummary?.grossSales ??
+          closingData?.grossSales ??
+          0,
+
+        netSales:
+          closingSummary?.netSales ??
+          closingData?.netSales ??
+          0,
+      };
+
+      console.log("CLOSING PRINT PAYLOAD:", closingPrintPayload);
+
+      await api.printClosingReceipt(closingPrintPayload);
+
+      alert("Sesi kasir berhasil ditutup dan rekap closing berhasil dicetak.");
+    } catch (printError) {
+      console.error("Gagal print struk closing:", printError);
+      alert("Sesi kasir berhasil ditutup, tetapi struk closing gagal dicetak.");
+    }
 
     setActualCash("");
     setClosedBy("");

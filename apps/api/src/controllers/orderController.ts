@@ -1,8 +1,7 @@
 import { FastifyRequest, FastifyReply } from "fastify";
 import { z } from "zod";
-import { prisma } from "../prisma";
+import { orderService } from "../services/orderService";
 
-// ====== 1. SCHEMA VALIDASI (ZOD) ======
 const orderItemSchema = z.object({
   menuId: z.number().int().positive(),
   qty: z.number().int().positive(),
@@ -22,137 +21,11 @@ const paySchema = z.object({
   overrideNote: z.string().trim().optional(),
 });
 
-// --- SCHEMA BARU UNTUK VOID ---
 const voidSchema = z.object({
   pin: z.string().min(1, "PIN wajib diisi"),
   reason: z.string().trim().min(3, "Alasan void wajib diisi minimal 3 karakter"),
   voidedBy: z.string().trim().optional(),
 });
-
-// ====== 2. HELPER FUNGSI STOK (TIDAK DISENTUH) ======
-type StockRequirement = {
-  ingredientId: number;
-  ingredientName: string;
-  unit: string;
-  stock: number;
-  need: number;
-  shortBy: number;
-};
-
-function buildStockRequirements(
-  details: Array<{ menuId: number; qty: number }>,
-  recipes: Array<{ menuId: number; ingredientId: number; amountNeeded: number }>,
-  ingredients: Array<{ id: number; name: string; stock: number; unit: string }>
-): StockRequirement[] {
-  const qtyByMenu = new Map<number, number>();
-
-  for (const d of details) {
-    qtyByMenu.set(d.menuId, (qtyByMenu.get(d.menuId) ?? 0) + d.qty);
-  }
-
-  const totalNeeded = new Map<number, number>();
-
-  for (const r of recipes) {
-    const qty = qtyByMenu.get(r.menuId) ?? 0;
-    const need = r.amountNeeded * qty;
-    totalNeeded.set(r.ingredientId, (totalNeeded.get(r.ingredientId) ?? 0) + need);
-  }
-
-  const ingredientMap = new Map(ingredients.map((item) => [item.id, item]));
-
-  return [...totalNeeded.entries()].map(([ingredientId, need]) => {
-    const ingredient = ingredientMap.get(ingredientId);
-
-    if (!ingredient) {
-      throw new Error(`Ingredient ${ingredientId} not found`);
-    }
-
-    const shortBy = Math.max(need - ingredient.stock, 0);
-
-    return {
-      ingredientId,
-      ingredientName: ingredient.name,
-      unit: ingredient.unit,
-      stock: ingredient.stock,
-      need,
-      shortBy,
-    };
-  });
-}
-
-async function getOrderStockSummary(orderId: number) {
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-    include: { details: true },
-  });
-
-  if (!order) return null;
-
-  const menuIds = [...new Set(order.details.map((d) => d.menuId))];
-
-  const recipes = menuIds.length
-    ? await prisma.recipe.findMany({
-        where: { menuId: { in: menuIds } },
-      })
-    : [];
-
-  const ingredientIds = [...new Set(recipes.map((r) => r.ingredientId))];
-
-  const ingredients = ingredientIds.length
-    ? await prisma.ingredient.findMany({
-        where: { id: { in: ingredientIds } },
-      })
-    : [];
-
-  const requirements = buildStockRequirements(order.details, recipes, ingredients);
-  const shortages = requirements.filter((item) => item.shortBy > 0);
-
-  return {
-    order,
-    requirements,
-    shortages,
-  };
-}
-
-async function generateQueueNumber(tx: any) {
-  const now = new Date();
-  const day = String(now.getDate()).padStart(2, "0");
-  const prefix = `#${day}-`;
-
-  const existingOrders = await tx.order.findMany({
-    where: {
-      queueNumber: {
-        startsWith: prefix,
-      },
-    },
-    select: {
-      queueNumber: true,
-    },
-    orderBy: {
-      id: "desc",
-    },
-    take: 100,
-  });
-
-  let maxSequence = 0;
-
-  for (const order of existingOrders) {
-    if (!order.queueNumber) continue;
-
-    const sequenceText = order.queueNumber.replace(prefix, "");
-    const sequenceNumber = Number(sequenceText);
-
-    if (Number.isFinite(sequenceNumber)) {
-      maxSequence = Math.max(maxSequence, sequenceNumber);
-    }
-  }
-
-  const nextSequence = String(maxSequence + 1).padStart(3, "0");
-
-  return `${prefix}${nextSequence}`;
-}
-
-// ====== 3. FUNGSI CONTROLLER ======
 
 export const createOrder = async (req: FastifyRequest, reply: FastifyReply) => {
   const parsed = orderCreateSchema.safeParse(req.body);
@@ -164,95 +37,55 @@ export const createOrder = async (req: FastifyRequest, reply: FastifyReply) => {
   const userId = (req as any).user?.id || (req as any).user?.userId;
 
   if (!userId) {
-    return reply.code(401).send({ error: "Unauthorized: User ID tidak ditemukan dalam token." });
+    return reply
+      .code(401)
+      .send({ error: "Unauthorized: User ID tidak ditemukan dalam token." });
   }
 
-  const { origin, customerName, items, branch, sessionId } = parsed.data;
-
-  const menus = await prisma.menu.findMany({
-    where: { id: { in: items.map((i) => i.menuId) } },
-    select: {
-      id: true,
-      name: true,
-      price: true,
-      prepStation: true,
-      isAvailable: true,
-    },
+  const result = await orderService.createOrder({
+    ...parsed.data,
+    userId: Number(userId),
   });
 
-  const menuMap = new Map(menus.map((m) => [m.id, m]));
-
-  if (menus.length !== new Set(items.map((i) => i.menuId)).size) {
-    return reply.code(400).send({ error: "Ada menu yang tidak ditemukan." });
-  }
-
-  const unavailableMenus = menus.filter((menu) => !menu.isAvailable);
-
-  if (unavailableMenus.length > 0) {
-    return reply.code(409).send({
-      error: "MENU_NOT_AVAILABLE",
-      message: "Ada menu yang sedang tidak tersedia.",
-      menus: unavailableMenus.map((menu) => ({
-        id: menu.id,
-        name: menu.name,
-      })),
+  if (result.kind === "MENU_NOT_FOUND") {
+    return reply.code(400).send({
+      error: "Ada menu yang tidak ditemukan.",
     });
   }
 
-  const details = items.map((i) => {
-  const menu = menuMap.get(i.menuId)!;
-  const subtotal = menu.price * i.qty;
+  if (result.kind === "MENU_NOT_AVAILABLE") {
+    return reply.code(409).send({
+      error: "MENU_NOT_AVAILABLE",
+      message: "Ada menu yang sedang tidak tersedia.",
+      menus: result.menus,
+    });
+  }
 
-    return {
-      menuId: menu.id,
-      qty: i.qty,
-      price: menu.price,
-      subtotal,
-      prepStation: menu.prepStation,
-      prepStatus: "PENDING" as const,
-    };
-  });
-
-  const totalPrice = details.reduce((sum, item) => sum + item.subtotal, 0);
-
-  const order = await prisma.order.create({
-    data: {
-      userId: Number(userId),
-      origin,
-      customerName,
-      totalPrice,
-      branch: branch || "PUSAT",
-      sessionId: sessionId || null,
-      paymentStatus: "UNPAID",
-      details: {
-        create: details,
-      },
-    },
-    include: { details: true },
-  });
-
-  return reply.send(order);
+  return reply.send(result.order);
 };
 
-export const checkOrderStock = async (req: FastifyRequest, reply: FastifyReply) => {
+export const checkOrderStock = async (
+  req: FastifyRequest,
+  reply: FastifyReply
+) => {
   const id = Number((req.params as any).id);
 
   if (!Number.isFinite(id)) {
     return reply.code(400).send({ error: "Invalid id" });
   }
 
-  const summary = await getOrderStockSummary(id);
+  const result = await orderService.checkOrderStock(id);
 
-  if (!summary) {
+  if (result.kind === "NOT_FOUND") {
     return reply.code(404).send({ error: "Order not found" });
   }
 
   return reply.send({
     ok: true,
-    orderId: summary.order.id,
-    hasShortage: summary.shortages.length > 0,
-    requirements: summary.requirements,
-    shortages: summary.shortages,
+    orderId: result.orderId,
+    hasShortage: result.hasShortage,
+    requirements: result.requirements,
+    shortages: result.shortages,
   });
 };
 
@@ -263,181 +96,55 @@ export const payOrder = async (req: FastifyRequest, reply: FastifyReply) => {
     return reply.code(400).send({ error: parsed.error.flatten() });
   }
 
-  const { paymentMethod, overrideStock, overrideNote } = parsed.data;
   const id = Number((req.params as any).id);
 
   if (!Number.isFinite(id)) {
     return reply.code(400).send({ error: "Invalid id" });
   }
 
-  const txResult = await prisma.$transaction(async (tx) => {
-    await tx.$executeRawUnsafe(
-      `SELECT id FROM "Order" WHERE id = ${id} FOR UPDATE`
-    );
-
-  const lockedOrder = await tx.order.findUnique({
-    where: { id },
-    include: {
-      details: {
-        include: {
-          menu: {
-            select: {
-              id: true,
-              name: true,
-              isAvailable: true,
-            },
-          },
-        },
-      },
-    },
+  const result = await orderService.payOrder({
+    orderId: id,
+    ...parsed.data,
   });
 
-    if (!lockedOrder) {
-      return { kind: "NOT_FOUND" as const };
-    }
-
-    if (lockedOrder.paymentStatus === "PAID") {
-      return {
-        kind: "ALREADY_PAID" as const,
-        order: lockedOrder,
-      };
-    }
-
-    if (lockedOrder.paymentStatus === "VOID") {
-      return { kind: "VOID" as const };
-    }
-
-    const unavailableMenus = lockedOrder.details
-  .map((detail) => detail.menu)
-  .filter((menu) => !menu.isAvailable);
-
-  if (unavailableMenus.length > 0) {
-    return {
-      kind: "MENU_NOT_AVAILABLE" as const,
-      menus: unavailableMenus.map((menu) => ({
-        id: menu.id,
-        name: menu.name,
-      })),
-    };
-  }
-
-    const menuIds = [...new Set(lockedOrder.details.map((d) => d.menuId))];
-
-    const recipes = menuIds.length
-      ? await tx.recipe.findMany({
-          where: { menuId: { in: menuIds } },
-        })
-      : [];
-
-    const ingredientIds = [...new Set(recipes.map((r) => r.ingredientId))];
-
-    if (ingredientIds.length) {
-      await tx.$executeRawUnsafe(
-        `SELECT id FROM "Ingredient" WHERE id IN (${ingredientIds.join(",")}) FOR UPDATE`
-      );
-    }
-
-    const lockedIngredients = ingredientIds.length
-      ? await tx.ingredient.findMany({
-          where: { id: { in: ingredientIds } },
-        })
-      : [];
-
-    const requirements = buildStockRequirements(
-      lockedOrder.details,
-      recipes,
-      lockedIngredients
-    );
-
-    const shortages = requirements.filter((item) => item.shortBy > 0);
-
-    if (shortages.length > 0 && !overrideStock) {
-      return {
-        kind: "SHORTAGE" as const,
-        shortages,
-      };
-    }
-
-    const didOverride = shortages.length > 0 && overrideStock;
-
-    const queueNumber = await generateQueueNumber(tx);
-
-    const paidOrder = await tx.order.update({
-      where: { id: lockedOrder.id },
-      data: {
-        paymentStatus: "PAID",
-        paymentMethod,
-        stockOverride: didOverride,
-        overrideNote: didOverride ? overrideNote : null,
-        paidAt: lockedOrder.paidAt ?? new Date(),
-        queueNumber,
-      },
-      include: { details: true },
-    });
-
-    for (const item of requirements) {
-      await tx.ingredient.update({
-        where: { id: item.ingredientId },
-        data: { stock: { decrement: item.need } },
-      });
-
-      await tx.stockMovement.create({
-        data: {
-          ingredientId: item.ingredientId,
-          qtyChange: -item.need,
-          reason: didOverride ? "SALE_OVERRIDE" : "SALE",
-          orderId: lockedOrder.id,
-        },
-      });
-    }
-
-    return {
-      kind: "PAID" as const,
-      order: paidOrder,
-      shortages,
-    };
-  });
-
-  if (txResult.kind === "NOT_FOUND") {
+  if (result.kind === "NOT_FOUND") {
     return reply.code(404).send({ error: "Order not found" });
   }
 
-  if (txResult.kind === "VOID") {
+  if (result.kind === "VOID") {
     return reply.code(409).send({ error: "Order already VOID" });
   }
 
-  if (txResult.kind === "MENU_NOT_AVAILABLE") {
-  return reply.code(409).send({
-    error: "MENU_NOT_AVAILABLE",
-    message: "Ada menu yang sedang tidak tersedia.",
-    menus: txResult.menus,
-  });
-}
-
-  if (txResult.kind === "SHORTAGE") {
+  if (result.kind === "MENU_NOT_AVAILABLE") {
     return reply.code(409).send({
-      error: "STOCK_NOT_ENOUGH",
-      shortages: txResult.shortages,
+      error: "MENU_NOT_AVAILABLE",
+      message: "Ada menu yang sedang tidak tersedia.",
+      menus: result.menus,
     });
   }
 
-  if (txResult.kind === "ALREADY_PAID") {
+  if (result.kind === "SHORTAGE") {
+    return reply.code(409).send({
+      error: "STOCK_NOT_ENOUGH",
+      shortages: result.shortages,
+    });
+  }
+
+  if (result.kind === "ALREADY_PAID") {
     return reply.send({
       ok: true,
       alreadyPaid: true,
-      order: txResult.order,
+      order: result.order,
     });
   }
 
   return reply.send({
     ok: true,
     alreadyPaid: false,
-    order: txResult.order,
-    shortages: txResult.shortages,
+    order: result.order,
+    shortages: result.shortages,
   });
 };
-
-// ====== 4. FUNGSI BARU: VOID ORDER ======
 
 export const voidOrder = async (req: FastifyRequest, reply: FastifyReply) => {
   const parsed = voidSchema.safeParse(req.body);
@@ -446,143 +153,43 @@ export const voidOrder = async (req: FastifyRequest, reply: FastifyReply) => {
     return reply.code(400).send({ error: parsed.error.flatten() });
   }
 
-  const { pin, reason, voidedBy } = parsed.data;
   const id = Number((req.params as any).id);
 
   if (!Number.isFinite(id)) {
     return reply.code(400).send({ error: "Invalid id" });
   }
 
-  const MANAGER_PIN = process.env.MANAGER_PIN || "123456";
-
-  if (pin !== MANAGER_PIN) {
-    return reply
-      .code(403)
-      .send({ error: "PIN Manager Salah. Otorisasi VOID ditolak." });
-  }
-
   try {
-    const txResult = await prisma.$transaction(async (tx) => {
-      await tx.$executeRawUnsafe(
-        `SELECT id FROM "Order" WHERE id = ${id} FOR UPDATE`
-      );
-
-      const lockedOrder = await tx.order.findUnique({ where: { id } });
-
-      if (!lockedOrder) return { kind: "NOT_FOUND" as const };
-
-      if (lockedOrder.paymentStatus === "VOID") {
-        return { kind: "ALREADY_VOID" as const };
-      }
-
-      const movements = await tx.stockMovement.findMany({
-        where: { orderId: id },
-      });
-
-      for (const mov of movements) {
-        const amountToReturn = Math.abs(mov.qtyChange);
-
-        await tx.ingredient.update({
-          where: { id: mov.ingredientId },
-          data: { stock: { increment: amountToReturn } },
-        });
-
-        await tx.stockMovement.create({
-          data: {
-            ingredientId: mov.ingredientId,
-            qtyChange: amountToReturn,
-            reason: "RESTOCK",
-            orderId: id,
-          },
-        });
-      }
-
-      const voidedOrder = await tx.order.update({
-        where: { id },
-        data: {
-          paymentStatus: "VOID",
-          voidReason: reason,
-          voidedBy: voidedBy || "Manager",
-          voidedAt: new Date(),
-        },
-      });
-
-      if (lockedOrder.sessionId) {
-      const session = await tx.cashSession.findUnique({
-        where: { id: lockedOrder.sessionId },
-      });
-
-      if (session && session.status === "CLOSED") {
-        const paidOrders = await tx.order.findMany({
-          where: {
-            sessionId: lockedOrder.sessionId,
-            paymentStatus: "PAID",
-          },
-          select: {
-            paymentMethod: true,
-            totalPrice: true,
-          },
-        });
-
-        const cashSales = paidOrders
-          .filter((order) => order.paymentMethod === "CASH")
-          .reduce((sum, order) => sum + order.totalPrice, 0);
-
-        const qrisSales = paidOrders
-          .filter((order) => order.paymentMethod === "QRIS")
-          .reduce((sum, order) => sum + order.totalPrice, 0);
-
-        const expenses = await tx.expense.findMany({
-          where: {
-            sessionId: lockedOrder.sessionId,
-          },
-          select: {
-            amount: true,
-          },
-        });
-
-        const totalExpenses = expenses.reduce(
-          (sum, expense) => sum + expense.amount,
-          0
-        );
-
-        const expectedCash =
-          Number(session.initialCash || 0) + cashSales - totalExpenses;
-
-        const actualCash = Number(session.actualCash || 0);
-        const difference = actualCash - expectedCash;
-
-        await tx.cashSession.update({
-          where: { id: lockedOrder.sessionId },
-          data: {
-            expectedCash,
-            difference,
-          },
-        });
-      }
-    }
-
-
-      return { kind: "SUCCESS" as const, order: voidedOrder };
+    const result = await orderService.voidOrder({
+      orderId: id,
+      ...parsed.data,
     });
 
-    if (txResult.kind === "NOT_FOUND") {
+    if (result.kind === "INVALID_PIN") {
+      return reply
+        .code(403)
+        .send({ error: "PIN Manager Salah. Otorisasi VOID ditolak." });
+    }
+
+    if (result.kind === "NOT_FOUND") {
       return reply.code(404).send({ error: "Order tidak ditemukan." });
     }
 
-    if (txResult.kind === "ALREADY_VOID") {
-      return reply.code(400).send({ error: "Order ini sudah pernah di-VOID." });
+    if (result.kind === "ALREADY_VOID") {
+      return reply.code(400).send({
+        error: "Order ini sudah pernah di-VOID.",
+      });
     }
 
     return reply.send({
       ok: true,
       message:
         "Transaksi berhasil di-VOID. Stok bahan baku telah dikembalikan ke sistem.",
-      order: txResult.order,
+      order: result.order,
       voidAudit: {
-        reason: txResult.order.voidReason,
-        voidedBy: txResult.order.voidedBy,
-        voidedAt: txResult.order.voidedAt,
+        reason: result.order.voidReason,
+        voidedBy: result.order.voidedBy,
+        voidedAt: result.order.voidedAt,
       },
     });
   } catch (error: any) {
