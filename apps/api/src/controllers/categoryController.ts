@@ -1,31 +1,38 @@
-import { FastifyRequest, FastifyReply } from 'fastify'; 
-import { prisma } from "../prisma";
+import { FastifyRequest, FastifyReply } from "fastify";
+import { categoryService } from "../services/categoryService";
 
 function isOwner(req: FastifyRequest) {
   const user = req.user as any;
+
   return user?.role === "OWNER";
 }
 
-function slugify(text: string) {
-  return text
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "");
+function forbidIfNotOwner(req: FastifyRequest, reply: FastifyReply) {
+  if (!isOwner(req)) {
+    reply.code(403).send({
+      message: "Akses ditolak. Hanya Owner.",
+    });
+
+    return true;
+  }
+
+  return false;
 }
 
-export const getAllCategories = async (_req: FastifyRequest, reply: FastifyReply) => {
-  const categories = await prisma.category.findMany({
-    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-  });
+export const getAllCategories = async (
+  _req: FastifyRequest,
+  reply: FastifyReply
+) => {
+  const categories = await categoryService.getAllCategories();
 
   return reply.send(categories);
 };
 
-export const createCategory = async (req: FastifyRequest, reply: FastifyReply) => {
-  if (!isOwner(req)) {
-    return reply.code(403).send({ message: "Akses ditolak. Hanya Owner." });
-  }
+export const createCategory = async (
+  req: FastifyRequest,
+  reply: FastifyReply
+) => {
+  if (forbidIfNotOwner(req, reply)) return;
 
   const { name, sortOrder, isActive } = req.body as {
     name: string;
@@ -33,97 +40,106 @@ export const createCategory = async (req: FastifyRequest, reply: FastifyReply) =
     isActive?: boolean;
   };
 
-  if (!name?.trim()) {
-    return reply.code(400).send({ message: "Nama kategori wajib diisi." });
-  }
-
-  const slug = slugify(name);
-
-  const existing = await prisma.category.findUnique({
-    where: { slug },
+  const result = await categoryService.createCategory({
+    name,
+    sortOrder,
+    isActive,
   });
 
-  if (existing) {
-    return reply.code(409).send({ message: "Kategori sudah ada." });
+  if (result.kind === "VALIDATION_ERROR") {
+    return reply.code(400).send({
+      message: result.message,
+    });
   }
 
-  const category = await prisma.category.create({
-    data: {
-      name: name.trim(),
-      slug,
-      sortOrder: sortOrder ?? 0,
-      isActive: isActive ?? true,
-    },
-  });
+  if (result.kind === "DUPLICATE") {
+    return reply.code(409).send({
+      message: "Kategori sudah ada.",
+    });
+  }
 
   return reply.code(201).send({
     message: "Kategori berhasil ditambahkan.",
-    data: category,
+    data: result.category,
   });
 };
 
-export const updateCategory = async (req: FastifyRequest, reply: FastifyReply) => {
-  if (!isOwner(req)) {
-    return reply.code(403).send({ message: "Akses ditolak. Hanya Owner." });
-  }
+export const updateCategory = async (
+  req: FastifyRequest,
+  reply: FastifyReply
+) => {
+  if (forbidIfNotOwner(req, reply)) return;
 
   const { id } = req.params as { id: string };
+  const categoryId = Number(id);
+
+  if (!Number.isFinite(categoryId)) {
+    return reply.code(400).send({
+      message: "ID kategori tidak valid.",
+    });
+  }
+
   const { name, sortOrder, isActive } = req.body as {
     name?: string;
     sortOrder?: number;
     isActive?: boolean;
   };
 
-  const data: any = {};
+  const result = await categoryService.updateCategory({
+    id: categoryId,
+    name,
+    sortOrder,
+    isActive,
+  });
 
-  if (name !== undefined) {
-    data.name = name.trim();
-    data.slug = slugify(name);
+  if (result.kind === "VALIDATION_ERROR") {
+    return reply.code(400).send({
+      message: result.message,
+    });
   }
 
-  if (sortOrder !== undefined) data.sortOrder = sortOrder;
-  if (isActive !== undefined) data.isActive = isActive;
-
-  try {
-    const category = await prisma.category.update({
-      where: { id: Number(id) },
-      data,
+  if (result.kind === "NOT_FOUND") {
+    return reply.code(404).send({
+      message: "Kategori tidak ditemukan.",
     });
-
-    return reply.send({
-      message: "Kategori berhasil diupdate.",
-      data: category,
-    });
-  } catch {
-    return reply.code(404).send({ message: "Kategori tidak ditemukan." });
   }
+
+  return reply.send({
+    message: "Kategori berhasil diupdate.",
+    data: result.category,
+  });
 };
 
-export const deleteCategory = async (req: FastifyRequest, reply: FastifyReply) => {
-  if (!isOwner(req)) {
-    return reply.code(403).send({ message: "Akses ditolak. Hanya Owner." });
-  }
+export const deleteCategory = async (
+  req: FastifyRequest,
+  reply: FastifyReply
+) => {
+  if (forbidIfNotOwner(req, reply)) return;
 
   const { id } = req.params as { id: string };
   const categoryId = Number(id);
 
-  const usedByMenus = await prisma.menu.count({
-    where: { categoryId },
-  });
+  if (!Number.isFinite(categoryId)) {
+    return reply.code(400).send({
+      message: "ID kategori tidak valid.",
+    });
+  }
 
-  if (usedByMenus > 0) {
+  const result = await categoryService.deleteCategory(categoryId);
+
+  if (result.kind === "USED_BY_MENU") {
     return reply.code(409).send({
       message: "Kategori tidak bisa dihapus karena masih dipakai menu.",
     });
   }
 
-  try {
-    await prisma.category.delete({
-      where: { id: categoryId },
+  if (result.kind === "NOT_FOUND") {
+    return reply.code(404).send({
+      message: "Kategori tidak ditemukan.",
     });
-
-    return reply.send({ message: "Kategori berhasil dihapus." });
-  } catch {
-    return reply.code(404).send({ message: "Kategori tidak ditemukan." });
   }
+
+  return reply.send({
+    message: "Kategori berhasil dihapus.",
+  });
 };
