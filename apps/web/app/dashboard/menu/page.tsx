@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 
@@ -58,38 +58,45 @@ export default function MenuListPage() {
   const [editIsAvailable, setEditIsAvailable] = useState(true);
   const [isEditSaving, setIsEditSaving] = useState(false);
   const [availabilityUpdatingId, setAvailabilityUpdatingId] = useState<number | null>(null);
-  const getToken = () => document.cookie.split("; ").find((row) => row.startsWith("kanovi_token="))?.split("=")[1];
+  const getToken = useCallback(() => {
+    return document.cookie
+      .split("; ")
+      .find((row) => row.startsWith("kanovi_token="))
+      ?.split("=")[1];
+  }, []);
 
-    const apiRequest = async (path: string, options: RequestInit = {}) => {
-    const token = getToken();
+  const apiRequest = useCallback(
+    async (path: string, options: RequestInit = {}) => {
+      const token = getToken();
 
-    if (!token) {
-      throw new Error("Token login tidak ditemukan. Silakan login ulang.");
-    }
+      if (!token) {
+        throw new Error("Token login tidak ditemukan. Silakan login ulang.");
+      }
 
-    const headers: HeadersInit = {
-      Authorization: `Bearer ${token}`,
-      ...(options.body ? { "Content-Type": "application/json" } : {}),
-      ...(options.headers || {}),
-    };
+      const headers: HeadersInit = {
+        Authorization: `Bearer ${token}`,
+        ...(options.body ? { "Content-Type": "application/json" } : {}),
+        ...(options.headers || {}),
+      };
 
-    const res = await fetch(`${API_BASE}${path}`, {
-      ...options,
-      headers,
-      cache: "no-store",
-    });
+      const res = await fetch(`${API_BASE}${path}`, {
+        ...options,
+        headers,
+        cache: "no-store",
+      });
 
-    const data = await res.json().catch(() => null);
+      const data = await res.json().catch(() => null);
 
-    if (!res.ok) {
-      throw new Error(data?.message || `Request gagal (${res.status})`);
-    }
+      if (!res.ok) {
+        throw new Error(data?.message || `Request gagal (${res.status})`);
+      }
 
-    return data;
-  };
+      return data;
+    },
+    [getToken]
+  );
 
-
-  const fetchMenus = async () => {
+  const fetchMenus = useCallback(async () => {
     try {
       const data = await apiRequest("/api/menus");
       setMenus(Array.isArray(data) ? data : []);
@@ -97,27 +104,31 @@ export default function MenuListPage() {
       console.error("fetchMenus error:", error);
       toast.error(error instanceof Error ? error.message : "Gagal mengambil menu");
     }
-  };
+  }, [apiRequest]);
 
-  const fetchCategories = async () => {
-  try {
-    const data = await apiRequest("/categories");
-    setCategories(Array.isArray(data) ? data : []);
-  } catch (error) {
-    console.error("fetchCategories error:", error);
-    toast.error(error instanceof Error ? error.message : "Gagal mengambil kategori");
-  }
-};
+  const fetchCategories = useCallback(async () => {
+    try {
+      const data = await apiRequest("/categories");
+      setCategories(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("fetchCategories error:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Gagal mengambil kategori"
+      );
+    }
+  }, [apiRequest]);
 
-  const fetchIngredients = async () => {
-  try {
-    const data = await apiRequest("/api/ingredients");
-    setIngredients(Array.isArray(data) ? data : []);
-  } catch (error) {
-    console.error("fetchIngredients error:", error);
-    toast.error(error instanceof Error ? error.message : "Gagal mengambil ingredient");
-  }
-};
+  const fetchIngredients = useCallback(async () => {
+    try {
+      const data = await apiRequest("/api/ingredients");
+      setIngredients(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("fetchIngredients error:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Gagal mengambil ingredient"
+      );
+    }
+  }, [apiRequest]);
 
   const openRecipeModal = async (menu: Menu) => {
     setSelectedMenu(menu);
@@ -333,13 +344,13 @@ export default function MenuListPage() {
   };
 
   useEffect(() => {
-  if (hasLoadedRef.current) return;
-  hasLoadedRef.current = true;
+    if (hasLoadedRef.current) return;
+    hasLoadedRef.current = true;
 
-  fetchMenus();
-  fetchIngredients();
-  fetchCategories();
-}, []);
+    fetchMenus();
+    fetchIngredients();
+    fetchCategories();
+  }, [fetchMenus, fetchIngredients, fetchCategories]);
 
 const filteredMenus = menus.filter((menu) => {
   const matchSearch = menu.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -674,7 +685,7 @@ const toggleMenuAvailability = async (menu: Menu) => {
         </div>
       ) : (
         <>
-          <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+          <div className="space-y-3 max-h-105 overflow-y-auto pr-1">
             {recipeItems.map((item, index) => {
               const selectedIngredient = ingredients.find(
                 (ingredient) => ingredient.id === Number(item.ingredientId)

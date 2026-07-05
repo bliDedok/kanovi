@@ -4,6 +4,7 @@ import { Printer, ReceiptText, X } from "lucide-react";
 import type { ReceiptData } from "../../types";
 import { formatCurrency, formatReceiptDate } from "../../lib/receipt";
 import { api } from "../../lib/api";
+import Image from "next/image";
 
 type ReceiptModalProps = {
   receipt: ReceiptData;
@@ -52,10 +53,12 @@ export default function ReceiptModal({ receipt, onClose }: ReceiptModalProps) {
           <div className="w-[80mm] max-w-[80mm] rounded-2xl bg-white p-4 text-black shadow-inner">
             <div className="text-center">
               <div className="mx-auto mb-3 flex justify-center">
-                <img
+                <Image
                   src={logoPath}
-                  alt="Kanovi Logo"
-                  className="h-50 w-50 object-contain"
+                  alt="Preview"
+                  width={300}
+                  height={300}
+                  className="..."
                 />
               </div>
 

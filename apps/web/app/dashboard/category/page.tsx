@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 
@@ -25,41 +25,45 @@ export default function CategoryListPage() {
     name: string;
   } | null>(null);
 
-  const getToken = () =>
-    document.cookie
-      .split("; ")
-      .find((row) => row.startsWith("kanovi_token="))
-      ?.split("=")[1];
+  const getToken = useCallback(() => {
+  return document.cookie
+    .split("; ")
+    .find((row) => row.startsWith("kanovi_token="))
+    ?.split("=")[1];
+  }, []);
 
-  const apiRequest = async (path: string, options: RequestInit = {}) => {
-    const token = getToken();
+  const apiRequest = useCallback(
+    async (path: string, options: RequestInit = {}) => {
+      const token = getToken();
 
-    if (!token) {
-      throw new Error("Token login tidak ditemukan. Silakan login ulang.");
-    }
+      if (!token) {
+        throw new Error("Token login tidak ditemukan. Silakan login ulang.");
+      }
 
-    const headers: HeadersInit = {
-      Authorization: `Bearer ${token}`,
-      ...(options.body ? { "Content-Type": "application/json" } : {}),
-      ...(options.headers || {}),
-    };
+      const headers: HeadersInit = {
+        Authorization: `Bearer ${token}`,
+        ...(options.body ? { "Content-Type": "application/json" } : {}),
+        ...(options.headers || {}),
+      };
 
-    const res = await fetch(`${API_BASE}${path}`, {
-      ...options,
-      headers,
-      cache: "no-store",
-    });
+      const res = await fetch(`${API_BASE}${path}`, {
+        ...options,
+        headers,
+        cache: "no-store",
+      });
 
-    const data = await res.json().catch(() => null);
+      const data = await res.json().catch(() => null);
 
-    if (!res.ok) {
-      throw new Error(data?.message || `Request gagal (${res.status})`);
-    }
+      if (!res.ok) {
+        throw new Error(data?.message || `Request gagal (${res.status})`);
+      }
 
-    return data;
-  };
+      return data;
+    },
+    [getToken]
+  );
 
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     try {
       const data = await apiRequest("/categories");
       setCategories(Array.isArray(data) ? data : []);
@@ -69,13 +73,11 @@ export default function CategoryListPage() {
         error instanceof Error ? error.message : "Gagal mengambil kategori"
       );
     }
-  };
+  }, [apiRequest]);
 
   useEffect(() => {
-    if (hasLoadedRef.current) return;
-    hasLoadedRef.current = true;
     fetchCategories();
-  }, []);
+  }, [fetchCategories]);
 
   const openDeleteModal = (id: number, name: string) => {
     setCategoryToDelete({ id, name });
@@ -150,7 +152,7 @@ export default function CategoryListPage() {
 
       <div className="bg-kanovi-paper dark:bg-kanovi-darker rounded-xl shadow-sm border border-kanovi-cream/50 dark:border-white/5 overflow-hidden">
         <div className="overflow-x-auto w-full">
-          <table className="w-full text-left border-collapse min-w-[700px]">
+          <table className="w-full text-left border-collapse min-w-175">
             <thead>
               <tr className="bg-kanovi-cream dark:bg-[#32251E] border-b-2 border-kanovi-wood/30 dark:border-white/10 text-kanovi-coffee dark:text-kanovi-cream text-xs md:text-sm uppercase tracking-wider shadow-sm">
                 <th className="p-3 md:p-4 font-bold">ID</th>
