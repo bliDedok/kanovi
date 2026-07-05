@@ -52,12 +52,3 @@ Endpoint pembayaran: `POST /orders/:id/pay` akan mengurangi stok bahan sesuai re
 - Kitchen screen: antrian + status pesanan
 
 
-Tes CI
-
-Tes Branch
-
-test branch
-
-Test branch 2
-
-test branchg
