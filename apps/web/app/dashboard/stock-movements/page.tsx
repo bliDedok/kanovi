@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowDownCircle,
@@ -89,32 +89,35 @@ export default function StockMovementHistoryPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchMovements = async (filters?: {
-    startDate?: string;
-    endDate?: string;
-    reason?: "" | StockReason;
-  }) => {
-    try {
-      setIsLoading(true);
+  const fetchMovements = useCallback(
+    async (filters?: {
+      startDate?: string;
+      endDate?: string;
+      reason?: "" | StockReason;
+    }) => {
+      try {
+        setIsLoading(true);
 
-    const selectedStartDate = filters?.startDate ?? startDate;
-    const selectedEndDate = filters?.endDate ?? endDate;
-    const selectedReason = filters?.reason ?? reason;
+        const selectedStartDate = filters?.startDate ?? startDate;
+        const selectedEndDate = filters?.endDate ?? endDate;
+        const selectedReason = filters?.reason ?? reason;
 
-    const response = (await api.getStockMovements({
-    startDate: selectedStartDate || undefined,
-    endDate: selectedEndDate || undefined,
-    reason: selectedReason || undefined,
-    })) as StockMovementResponse;
+        const response = (await api.getStockMovements({
+          startDate: selectedStartDate || undefined,
+          endDate: selectedEndDate || undefined,
+          reason: selectedReason || undefined,
+        })) as StockMovementResponse;
 
-      setMovements(response.data || []);
-      setSummary(response.summary || emptySummary);
-    } catch (error: any) {
-      alert(error?.message || "Gagal memuat riwayat perubahan stok.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        setMovements(response.data || []);
+        setSummary(response.summary || emptySummary);
+      } catch (error: any) {
+        alert(error?.message || "Gagal memuat riwayat perubahan stok.");
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [startDate, endDate, reason]
+  );
 
   useEffect(() => {
     fetchMovements({
@@ -122,7 +125,7 @@ export default function StockMovementHistoryPage() {
       endDate: "",
       reason: "",
     });
-  }, []);
+  }, [fetchMovements]);
 
   const filteredMovements = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();

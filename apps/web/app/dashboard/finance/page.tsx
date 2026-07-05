@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { 
   TrendingUp, Wallet, ArrowDownCircle, AlertTriangle, 
   Building2, Calendar, Filter, Edit3, Save, X, Coffee, Plus, Eye, ShoppingBag, Receipt, Clock, CheckCircle2, Download, Trophy, Target
@@ -27,20 +27,28 @@ export default function FinanceReportPage() {
   const [newExpense, setNewExpense] = useState({ amount: "", desc: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const fetchReports = async () => {
+  const fetchReports = useCallback(async () => {
     try {
       setLoading(true);
+
       const data = await api.getFinanceReport(startDate, endDate);
+
       if (data.reports) {
         setReports(data.reports);
         setTopProducts(data.topProducts || []);
       } else {
         setReports(data || []);
       }
-    } catch (err) { console.error(err); } finally { setLoading(false); }
-  };
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [startDate, endDate]);
 
-  useEffect(() => { fetchReports(); }, [startDate, endDate]);
+  useEffect(() => {
+  fetchReports();
+  }, [fetchReports]);
 
   const exportToExcel = () => {
     const dataForExcel = reports.map((r) => ({
